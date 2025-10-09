@@ -1,0 +1,24 @@
+{
+  "job_1_1756418190": {
+    "id": "job_1_1756418190",
+    "name": "Nightly Reindex",
+    "type": "sgi_reindex_all",
+    "schedule": "0 3 * * *",
+    "params": {},
+    "created": "2025-08-29T07:56:30.664529",
+    "next_run": null,
+    "last_run": "2025-08-29T07:56:49.399391",
+    "last_status": "completed"
+  },
+  "job_2_1756423314": {
+    "id": "job_2_1756423314",
+    "name": "test_job",
+    "type": "sgi_reindex_all",
+    "schedule": "every 1 hour",
+    "params": {},
+    "created": "2025-08-29T09:21:54.689568",
+    "next_run": null,
+    "last_run": "2025-10-09T19:45:53.843086",
+    "last_status": "completed"
+  }
+}

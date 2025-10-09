@@ -1,0 +1,196 @@
+# ShivX .gitignore - Production Hardening
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# PyInstaller / Builds
+*.exe
+*.dmg
+*.pkg
+*.deb
+backups/
+ShivX-Portable.zip
+
+# Testing / Coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+nul
+
+# Logs and databases
+*.log
+*.db
+*.sqlite
+*.sqlite3
+logs/
+var/logs/
+var/runtime/
+logs/telemetry/
+
+# Memory / Data
+memory/
+data/chroma_knowledge/
+data/episodic_memory.db
+data/knowledge.db
+data/memory/
+data/meta_learning.db
+data/semantic_memory.db
+memory/agi_test_report.json
+memory/autonomous_config.json
+memory/autonomous_goals.db
+memory/vector_store/
+memory/working_*.db
+memory/chroma_db/
+
+# Node modules and frontend builds
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.next/
+out/
+dash/frontend/node_modules/
+ui/node_modules/
+
+# Large ML/AI dependencies
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+models/
+*.h5
+*.pt
+*.onnx
+
+# Temporary files
+temp/
+tmp/
+*.temp
+state/
+# Build artifacts only (allow release/artifacts/)
+/dist/artifacts/
+/build/artifacts/
+
+# Configuration with secrets
+.env
+*.key
+*.pem
+*.p12
+config/shivx_password.hash
+var/
+
+# Reports (keep templates, ignore generated)
+reports/
+
+# Package lock files (optional - some teams commit these)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+uv.lock
+
+# Windows specific
+$RECYCLE.BIN/
+*.lnk
+
+# macOS specific
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Security
+.secrets
+secrets/
+*.env.local
+*.env.production
+*.env.development
+
+# Backups - CRITICAL TO IGNORE
+backups/
+*.backup
+*.bak
+*.old
+
+# Test outputs
+test_screenshot.png
+test_global.db
+
+# Documentation (generated)
+docs/SBOM.json
+
+# Release artifacts (commit manually when needed)
+# Comment out if you want to commit specific artifacts
+# release/artifacts/coverage_report.html
+# release/artifacts/load_test_results/*
+# release/artifacts/*.json
+
+# Cython debug symbols
+cython_debug/
