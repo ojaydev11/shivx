@@ -1,0 +1,38 @@
+﻿{
+    "results":  [
+                    {
+                        "recovery_time_sec":  8,
+                        "status":  "PASS",
+                        "data_loss":  false,
+                        "details":  "AgentService respawned successfully after SIGTERM",
+                        "test":  "process_kill_recovery"
+                    },
+                    {
+                        "recovery_time_sec":  5,
+                        "status":  "PASS",
+                        "details":  "Browser agent fell back to cached data successfully",
+                        "graceful_degradation":  true,
+                        "test":  "network_fault_recovery"
+                    },
+                    {
+                        "status":  "PASS",
+                        "error_logged":  true,
+                        "details":  "Queue manager logged error and paused writes until space available",
+                        "fallback_triggered":  true,
+                        "test":  "disk_full_handling"
+                    },
+                    {
+                        "status":  "PASS",
+                        "details":  "Vector memory cleanup triggered at 80% threshold",
+                        "cleanup_triggered":  true,
+                        "oom_prevented":  true,
+                        "test":  "memory_pressure_handling"
+                    }
+                ],
+    "executed_at":  "2025-10-10T07:09:40.3600087+11:00",
+    "tests_passed":  4,
+    "suite":  "chaos_resilience",
+    "tests_failed":  0,
+    "tests_run":  4,
+    "gate_g4_status":  "PASS"
+}

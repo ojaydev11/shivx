@@ -1,0 +1,25 @@
+﻿{
+    "bomFormat":  "CycloneDX",
+    "components":  [
+                       {
+                           "purl":  "pkg:pypi/fastapi@0.104.0",
+                           "name":  "fastapi",
+                           "version":  "0.104.0",
+                           "type":  "library"
+                       },
+                       {
+                           "purl":  "pkg:pypi/pytest@7.4.0",
+                           "name":  "pytest",
+                           "version":  "7.4.0",
+                           "type":  "library"
+                       },
+                       {
+                           "purl":  "pkg:pypi/playwright@1.40.0",
+                           "name":  "playwright",
+                           "version":  "1.40.0",
+                           "type":  "library"
+                       }
+                   ],
+    "specVersion":  "1.4",
+    "version":  1
+}

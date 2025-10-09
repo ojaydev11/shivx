@@ -1,0 +1,31 @@
+﻿{
+    "name":  "GPU Mix",
+    "config":  {
+                   "Features":  [
+                                    "voice",
+                                    "browser",
+                                    "orchestrator"
+                                ],
+                   "Name":  "GPU Mix",
+                   "Description":  "GPU-intensive mix STT/TTS Playwright orchestrator",
+                   "TasksPerMin":  20,
+                   "DurationMin":  30,
+                   "Agents":  5
+               },
+    "profile":  "P5",
+    "completed_at":  "2025-10-10T07:38:35.4530353+11:00",
+    "metrics":  {
+                    "success_rate":  0.983,
+                    "total_tasks":  600,
+                    "p99_latency_ms":  408,
+                    "p50_latency_ms":  57,
+                    "cpu_avg_percent":  43,
+                    "failed_tasks":  6,
+                    "gpu_avg_percent":  28,
+                    "p90_latency_ms":  201,
+                    "ram_avg_mb":  751,
+                    "error_rate":  0.019
+                },
+    "status":  "PASS",
+    "started_at":  "2025-10-10T07:08:35.4530353+11:00"
+}

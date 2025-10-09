@@ -1,0 +1,71 @@
+{
+  "dashboardName": "ShivX Production Metrics",
+  "version": "1.0.0",
+  "exportedAt": "2025-10-10T00:00:00Z",
+  "panels": [
+    {
+      "title": "Request Latency (p50/p90/p99)",
+      "type": "graph",
+      "metrics": [
+        "shivx.orchestrator.latency.p50",
+        "shivx.orchestrator.latency.p90",
+        "shivx.orchestrator.latency.p99"
+      ],
+      "unit": "milliseconds"
+    },
+    {
+      "title": "Error Rate",
+      "type": "graph",
+      "metrics": [
+        "shivx.errors.rate",
+        "shivx.errors.count"
+      ],
+      "unit": "percent"
+    },
+    {
+      "title": "Resource Utilization",
+      "type": "graph",
+      "metrics": [
+        "shivx.cpu.usage",
+        "shivx.memory.usage",
+        "shivx.gpu.usage"
+      ],
+      "unit": "percent"
+    },
+    {
+      "title": "Service Health",
+      "type": "status",
+      "metrics": [
+        "shivx.service.up",
+        "shivx.service.ready"
+      ],
+      "unit": "boolean"
+    }
+  ],
+  "alerts": [
+    {
+      "name": "High Error Rate",
+      "condition": "shivx.errors.rate > 1",
+      "severity": "warning"
+    },
+    {
+      "name": "Critical Error Rate",
+      "condition": "shivx.errors.rate > 5",
+      "severity": "critical"
+    },
+    {
+      "name": "High Latency p99",
+      "condition": "shivx.orchestrator.latency.p99 > 2000",
+      "severity": "warning"
+    }
+  ],
+  "logFormat": "json",
+  "logFields": [
+    "timestamp",
+    "level",
+    "service",
+    "trace_id",
+    "message",
+    "error"
+  ]
+}

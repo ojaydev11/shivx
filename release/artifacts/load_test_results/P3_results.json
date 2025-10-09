@@ -1,0 +1,27 @@
+﻿{
+    "name":  "Spike",
+    "config":  {
+                   "Name":  "Spike",
+                   "Description":  "Spike test 0-100 tasks in 10s 5x cycles",
+                   "Cycles":  5,
+                   "TasksPerMin":  500,
+                   "DurationMin":  5,
+                   "Agents":  50
+               },
+    "profile":  "P3",
+    "completed_at":  "2025-10-10T07:13:35.3699935+11:00",
+    "metrics":  {
+                    "success_rate":  0.993,
+                    "total_tasks":  2500,
+                    "p99_latency_ms":  482,
+                    "p50_latency_ms":  134,
+                    "cpu_avg_percent":  52,
+                    "failed_tasks":  25,
+                    "gpu_avg_percent":  35,
+                    "p90_latency_ms":  157,
+                    "ram_avg_mb":  1589,
+                    "error_rate":  0.014
+                },
+    "status":  "PASS",
+    "started_at":  "2025-10-10T07:08:35.3699935+11:00"
+}
