@@ -20,12 +20,17 @@ This is designed to be the MOST ADVANCED trading AI on the internet.
 import asyncio
 import logging
 import numpy as np
+import os
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from collections import deque
 import json
 from pathlib import Path
+
+# Devnet execution components
+from .solana_wallet_manager import SolanaWalletManager
+from .devnet_trade_executor import DevnetTradeExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -276,6 +281,9 @@ class AdvancedTradingAI:
     def __init__(self, config: Dict):
         self.config = config
 
+        # Trading mode: paper | devnet | mainnet
+        self.trading_mode = os.getenv('TRADING_MODE', 'paper').lower()
+
         # Initialize AI components
         self.rl_agent = ReinforcementLearningAgent(state_dim=100, action_dim=3)  # BUY/SELL/HOLD
         self.price_predictor = MLPricePredictor()
@@ -310,7 +318,11 @@ class AdvancedTradingAI:
         self.data_dir = Path("data/income/advanced_ai")
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info("Advanced Trading AI initialized with ensemble of 5 strategies")
+        # Devnet execution components (initialized lazily on first use)
+        self.wallet_manager = None
+        self.devnet_executor = None
+
+        logger.info(f"Advanced Trading AI initialized with ensemble of 5 strategies (mode: {self.trading_mode})")
 
     async def analyze_market(self, prices: Dict[str, float], volumes: Dict[str, float]) -> MarketState:
         """
@@ -674,16 +686,17 @@ class AdvancedTradingAI:
         logger.info(f"Executing {signal.action} signal for {signal.pair} "
                    f"(confidence={signal.confidence:.2f}, expected_profit={signal.expected_profit_pct:.2f}%)")
 
-        # This would integrate with actual trading execution
-        # For now, simulate execution
-
-        execution_result = {
-            'signal': signal,
-            'executed_at': datetime.utcnow(),
-            'success': True,
-            'actual_profit_pct': signal.expected_profit_pct * np.random.uniform(0.7, 1.3),  # Simulated
-            'slippage_pct': 0.05
-        }
+        # Execute based on trading mode
+        if self.trading_mode == 'devnet':
+            # Real blockchain execution on Solana Devnet
+            execution_result = await self._execute_devnet(signal)
+        elif self.trading_mode == 'mainnet':
+            # Real blockchain execution on Solana Mainnet
+            logger.warning("Mainnet execution not yet implemented - falling back to paper trading")
+            execution_result = self._execute_paper_trade(signal)
+        else:
+            # Paper trading (simulation)
+            execution_result = self._execute_paper_trade(signal)
 
         # Update RL agent with result (learn from experience)
         if len(self.market_state_history) > 0:
@@ -708,6 +721,118 @@ class AdvancedTradingAI:
         self.trade_history.append(execution_result)
 
         return execution_result
+
+    def _execute_paper_trade(self, signal: TradingSignal) -> Dict[str, Any]:
+        """
+        Execute paper trade (simulation)
+        """
+        logger.info(f"[PAPER TRADING] Simulating {signal.action} for {signal.pair}")
+
+        return {
+            'signal': signal,
+            'executed_at': datetime.utcnow(),
+            'success': True,
+            'actual_profit_pct': signal.expected_profit_pct * np.random.uniform(0.7, 1.3),  # Simulated
+            'slippage_pct': 0.05,
+            'mode': 'paper'
+        }
+
+    async def _execute_devnet(self, signal: TradingSignal) -> Dict[str, Any]:
+        """
+        Execute real trade on Solana Devnet
+        """
+        try:
+            # Initialize devnet components if needed
+            if self.wallet_manager is None:
+                logger.info("Initializing Solana Devnet wallet...")
+                wallet_path = os.getenv('DEVNET_WALLET_PATH', 'data/wallets/devnet_trading_wallet.json')
+                rpc_url = os.getenv('SOLANA_RPC_URL', 'https://api.devnet.solana.com')
+
+                self.wallet_manager = SolanaWalletManager(wallet_path=wallet_path, rpc_url=rpc_url)
+                await self.wallet_manager.initialize()
+
+                # Check balance and request airdrop if needed
+                balance = await self.wallet_manager.get_balance()
+                logger.info(f"Devnet wallet balance: {balance} SOL")
+
+                if balance < 0.5:
+                    logger.info("Requesting devnet airdrop...")
+                    await self.wallet_manager.request_airdrop(2.0)
+
+            # Initialize executor if needed
+            if self.devnet_executor is None:
+                from .jupiter_client import JupiterClient
+                jupiter = JupiterClient()
+                await jupiter.__aenter__()
+
+                max_slippage = int(os.getenv('MAX_SLIPPAGE_BPS', '100'))
+                self.devnet_executor = DevnetTradeExecutor(
+                    wallet_manager=self.wallet_manager,
+                    jupiter_client=jupiter,
+                    max_slippage_bps=max_slippage
+                )
+                logger.info("Devnet trade executor initialized")
+
+            # Parse trading pair (e.g., "SOL/USDC" -> input_token="USDC", output_token="SOL" for BUY)
+            tokens = signal.pair.split('/')
+            if len(tokens) != 2:
+                raise ValueError(f"Invalid trading pair: {signal.pair}")
+
+            base_token, quote_token = tokens[0], tokens[1]
+
+            # Determine input/output based on action
+            if signal.action == 'BUY':
+                # Buy base token with quote token (USDC -> SOL)
+                input_token = quote_token
+                output_token = base_token
+            else:  # SELL
+                # Sell base token for quote token (SOL -> USDC)
+                input_token = base_token
+                output_token = quote_token
+
+            # Get position size from config
+            position_size_usd = float(os.getenv('MAX_POSITION_SIZE_USD', '10'))
+
+            logger.info(f"[DEVNET] Executing {signal.action}: {input_token} -> {output_token}, ${position_size_usd}")
+
+            # Execute swap on devnet
+            trade_result = await self.devnet_executor.execute_swap(
+                input_token=input_token,
+                output_token=output_token,
+                amount_usd=position_size_usd,
+                action=signal.action
+            )
+
+            if trade_result.success:
+                logger.info(f"[DEVNET] Trade successful! Signature: {trade_result.signature}")
+                logger.info(f"[DEVNET] Profit: {trade_result.actual_profit_pct:.3f}%, Slippage: {trade_result.slippage_pct:.3f}%")
+            else:
+                logger.error(f"[DEVNET] Trade failed: {trade_result.error}")
+
+            return {
+                'signal': signal,
+                'executed_at': datetime.utcnow(),
+                'success': trade_result.success,
+                'actual_profit_pct': trade_result.actual_profit_pct,
+                'slippage_pct': trade_result.slippage_pct,
+                'signature': trade_result.signature,
+                'execution_time': trade_result.execution_time,
+                'error': trade_result.error,
+                'mode': 'devnet'
+            }
+
+        except Exception as e:
+            logger.error(f"[DEVNET] Execution failed: {e}", exc_info=True)
+
+            return {
+                'signal': signal,
+                'executed_at': datetime.utcnow(),
+                'success': False,
+                'actual_profit_pct': 0.0,
+                'slippage_pct': 0.0,
+                'error': str(e),
+                'mode': 'devnet'
+            }
 
     def get_dynamic_threshold(self, base_threshold: float, pair: str) -> float:
         """
