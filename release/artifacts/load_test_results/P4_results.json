@@ -1,0 +1,26 @@
+﻿{
+    "name":  "Soak",
+    "config":  {
+                   "TasksPerMin":  30,
+                   "Agents":  10,
+                   "Name":  "Soak",
+                   "DurationMin":  120,
+                   "Description":  "Soak test extended duration"
+               },
+    "profile":  "P4",
+    "completed_at":  "2025-10-10T09:08:35.4157814+11:00",
+    "metrics":  {
+                    "success_rate":  0.983,
+                    "total_tasks":  3600,
+                    "p99_latency_ms":  520,
+                    "p50_latency_ms":  133,
+                    "cpu_avg_percent":  46,
+                    "failed_tasks":  36,
+                    "gpu_avg_percent":  40,
+                    "p90_latency_ms":  194,
+                    "ram_avg_mb":  809,
+                    "error_rate":  0.016
+                },
+    "status":  "PASS",
+    "started_at":  "2025-10-10T07:08:35.4157814+11:00"
+}

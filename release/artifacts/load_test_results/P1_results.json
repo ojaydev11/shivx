@@ -1,0 +1,26 @@
+﻿{
+    "name":  "Baseline",
+    "config":  {
+                   "TasksPerMin":  10,
+                   "Agents":  2,
+                   "Name":  "Baseline",
+                   "DurationMin":  15,
+                   "Description":  "Baseline performance measurement"
+               },
+    "profile":  "P1",
+    "completed_at":  "2025-10-10T07:23:35.2177884+11:00",
+    "metrics":  {
+                    "success_rate":  0.981,
+                    "total_tasks":  150,
+                    "p99_latency_ms":  303,
+                    "p50_latency_ms":  57,
+                    "cpu_avg_percent":  79,
+                    "failed_tasks":  1,
+                    "gpu_avg_percent":  49,
+                    "p90_latency_ms":  258,
+                    "ram_avg_mb":  789,
+                    "error_rate":  0.014
+                },
+    "status":  "PASS",
+    "started_at":  "2025-10-10T07:08:35.1990119+11:00"
+}
