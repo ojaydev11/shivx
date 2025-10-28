@@ -3,34 +3,25 @@ Database Dependencies
 Provides database session to routes
 """
 
-from typing import Generator
+from typing import AsyncGenerator
 
-# Placeholder for database session
-# When implementing database:
-# from sqlalchemy.orm import Session
-# from app.database import SessionLocal
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db as _get_db
 
 
-async def get_db() -> Generator:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-    Get database session
+    Get async database session
 
     Usage:
         @app.get("/items")
-        async def get_items(db: Session = Depends(get_db)):
-            return db.query(Item).all()
+        async def get_items(db: AsyncSession = Depends(get_db)):
+            result = await db.execute(select(Item))
+            return result.scalars().all()
 
     Yields:
-        Database session
-
-    Note:
-        This is a placeholder. Implement when adding database.
+        AsyncSession: Async database session
     """
-    # db = SessionLocal()
-    # try:
-    #     yield db
-    # finally:
-    #     db.close()
-
-    # Placeholder - just yield None for now
-    yield None
+    async for session in _get_db():
+        yield session

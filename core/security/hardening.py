@@ -86,6 +86,164 @@ class SecurityAuditEntry:
     details: Dict[str, Any] = field(default_factory=dict)
 
 
+class PasswordValidator:
+    """
+    Password strength validation.
+
+    Enforces strong password requirements:
+    - Minimum 12 characters
+    - At least one uppercase letter
+    - At least one lowercase letter
+    - At least one digit
+    - At least one special character
+    - No common weak passwords
+    - Reasonable entropy
+    """
+
+    # Minimum password length
+    MIN_LENGTH = 12
+
+    # Common weak passwords to reject
+    WEAK_PASSWORDS = {
+        "password", "password123", "123456", "12345678", "qwerty",
+        "abc123", "letmein", "welcome", "monkey", "dragon",
+        "master", "sunshine", "princess", "admin", "administrator",
+        "root", "toor", "test", "guest", "user", "default",
+        "passw0rd", "p@ssw0rd", "p@ssword",
+    }
+
+    @classmethod
+    def validate_password(cls, password: str) -> tuple[bool, str]:
+        """
+        Validate password strength.
+
+        Args:
+            password: Password to validate
+
+        Returns:
+            Tuple of (is_valid, error_message)
+            If valid, error_message will be empty string
+        """
+        # Check minimum length
+        if len(password) < cls.MIN_LENGTH:
+            return False, f"Password must be at least {cls.MIN_LENGTH} characters long"
+
+        # Check for uppercase
+        if not re.search(r'[A-Z]', password):
+            return False, "Password must contain at least one uppercase letter"
+
+        # Check for lowercase
+        if not re.search(r'[a-z]', password):
+            return False, "Password must contain at least one lowercase letter"
+
+        # Check for digit
+        if not re.search(r'\d', password):
+            return False, "Password must contain at least one digit"
+
+        # Check for special character
+        if not re.search(r'[!@#$%^&*()_+\-=\[\]{};:\'",.<>?/\\|`~]', password):
+            return False, "Password must contain at least one special character (!@#$%^&*()_+-=[]{}etc.)"
+
+        # Check against common weak passwords
+        password_lower = password.lower()
+        for weak in cls.WEAK_PASSWORDS:
+            if weak in password_lower:
+                return False, f"Password contains common weak pattern: '{weak}'"
+
+        # Check for sequential characters (123, abc, etc.)
+        if cls._has_sequential_chars(password):
+            return False, "Password contains sequential characters (e.g., '123', 'abc')"
+
+        # Check for repeated characters (aaa, 111, etc.)
+        if cls._has_repeated_chars(password, 3):
+            return False, "Password contains too many repeated characters"
+
+        # Check minimum character diversity (entropy)
+        if len(set(password)) < 8:
+            return False, "Password must contain at least 8 different characters"
+
+        return True, ""
+
+    @classmethod
+    def _has_sequential_chars(cls, password: str, min_length: int = 3) -> bool:
+        """Check if password contains sequential characters"""
+        # Check for numeric sequences
+        for i in range(len(password) - min_length + 1):
+            segment = password[i:i+min_length]
+            if segment.isdigit():
+                digits = [int(d) for d in segment]
+                # Check ascending
+                if all(digits[j+1] == digits[j] + 1 for j in range(len(digits)-1)):
+                    return True
+                # Check descending
+                if all(digits[j+1] == digits[j] - 1 for j in range(len(digits)-1)):
+                    return True
+
+        # Check for alphabetic sequences
+        for i in range(len(password) - min_length + 1):
+            segment = password[i:i+min_length].lower()
+            if segment.isalpha():
+                chars = [ord(c) for c in segment]
+                # Check ascending
+                if all(chars[j+1] == chars[j] + 1 for j in range(len(chars)-1)):
+                    return True
+                # Check descending
+                if all(chars[j+1] == chars[j] - 1 for j in range(len(chars)-1)):
+                    return True
+
+        return False
+
+    @classmethod
+    def _has_repeated_chars(cls, password: str, max_repeats: int) -> bool:
+        """Check if password has too many repeated characters"""
+        for i in range(len(password) - max_repeats + 1):
+            if len(set(password[i:i+max_repeats])) == 1:
+                return True
+        return False
+
+    @classmethod
+    def get_password_strength_score(cls, password: str) -> int:
+        """
+        Calculate password strength score (0-100).
+
+        Args:
+            password: Password to score
+
+        Returns:
+            Score from 0 (weakest) to 100 (strongest)
+        """
+        score = 0
+
+        # Length score (0-40 points)
+        length_score = min(40, len(password) * 2)
+        score += length_score
+
+        # Character diversity score (0-30 points)
+        has_lower = bool(re.search(r'[a-z]', password))
+        has_upper = bool(re.search(r'[A-Z]', password))
+        has_digit = bool(re.search(r'\d', password))
+        has_special = bool(re.search(r'[!@#$%^&*()_+\-=\[\]{};:\'",.<>?/\\|`~]', password))
+
+        diversity_score = (has_lower * 7.5 + has_upper * 7.5 +
+                          has_digit * 7.5 + has_special * 7.5)
+        score += diversity_score
+
+        # Entropy score (0-30 points)
+        unique_chars = len(set(password))
+        entropy_score = min(30, unique_chars * 2)
+        score += entropy_score
+
+        # Penalize weak patterns
+        if cls._has_sequential_chars(password):
+            score -= 20
+        if cls._has_repeated_chars(password, 3):
+            score -= 15
+        if any(weak in password.lower() for weak in cls.WEAK_PASSWORDS):
+            score -= 25
+
+        return max(0, min(100, int(score)))
+
+
 class InputValidator:
     """
     Input validation and sanitization.
@@ -310,14 +468,48 @@ class AuthenticationManager:
         password: str,
         permissions: Optional[Set[Permission]] = None,
     ) -> User:
-        """Create a new user"""
+        """
+        Create a new user with strong password validation.
+
+        SECURITY: Enforces comprehensive password requirements:
+        - Minimum 12 characters
+        - Uppercase, lowercase, digit, special character
+        - No common weak passwords
+        - No sequential or repeated patterns
+        - Minimum character diversity
+
+        Args:
+            username: Username (must match username pattern)
+            password: Password (must meet strength requirements)
+            permissions: Set of permissions to grant
+
+        Returns:
+            Created User object
+
+        Raises:
+            ValueError: If username or password validation fails
+        """
         # Validate username
         if not InputValidator.validate_username(username):
-            raise ValueError(f"Invalid username: {username}")
+            raise ValueError(
+                f"Invalid username: {username}. "
+                "Username must be 3-32 characters, alphanumeric with hyphens/underscores only."
+            )
 
         # Check if exists
         if username in self.users:
             raise ValueError(f"User {username} already exists")
+
+        # CRITICAL SECURITY: Validate password strength
+        is_valid, error_message = PasswordValidator.validate_password(password)
+        if not is_valid:
+            raise ValueError(f"Password validation failed: {error_message}")
+
+        # Calculate and log password strength (for monitoring)
+        strength_score = PasswordValidator.get_password_strength_score(password)
+        logger.info(
+            f"Creating user {username} with password strength score: {strength_score}/100"
+        )
 
         # Hash password
         password_hash, salt = self.encryption.hash_password(password)
@@ -332,7 +524,7 @@ class AuthenticationManager:
         )
 
         self.users[username] = user
-        logger.info(f"Created user: {username}")
+        logger.info(f"Created user: {username} with permissions: {permissions}")
 
         return user
 
@@ -566,6 +758,7 @@ class SecurityHardeningEngine:
     """
 
     def __init__(self, master_key: Optional[bytes] = None):
+        self.password_validator = PasswordValidator()
         self.validator = InputValidator()
         self.encryption = EncryptionManager(master_key)
         self.auth = AuthenticationManager(self.encryption)

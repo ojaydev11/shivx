@@ -1,0 +1,393 @@
+# ============================================================================
+# ShivX Prometheus Alerting Rules
+# ============================================================================
+# Defines alerts for critical system and application conditions
+# ============================================================================
+
+groups:
+  # ==========================================================================
+  # API Performance Alerts
+  # ==========================================================================
+  - name: api_performance
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "High error rate detected"
+          description: "API error rate is {{ $value | humanizePercentage }} (threshold: 1%)"
+          runbook: "https://docs.shivx.io/runbooks/high-error-rate"
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API latency detected"
+          description: "P95 latency is {{ $value }}s (threshold: 500ms)"
+          runbook: "https://docs.shivx.io/runbooks/high-latency"
+
+      - alert: VeryHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2.0
+        for: 5m
+        labels:
+          severity: critical
+          component: api
+        annotations:
+          summary: "CRITICAL: Very high API latency"
+          description: "P95 latency is {{ $value }}s (threshold: 2s)"
+          runbook: "https://docs.shivx.io/runbooks/high-latency"
+
+      - alert: HighRequestRate
+        expr: sum(rate(http_requests_total[5m])) > 1000
+        for: 10m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Unusually high request rate"
+          description: "Request rate is {{ $value }} req/s"
+          runbook: "https://docs.shivx.io/runbooks/high-request-rate"
+
+  # ==========================================================================
+  # Database Alerts
+  # ==========================================================================
+  - name: database
+    interval: 30s
+    rules:
+      - alert: DatabaseConnectionFailure
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database is down"
+          description: "PostgreSQL database is unreachable"
+          runbook: "https://docs.shivx.io/runbooks/database-down"
+
+      - alert: DatabaseHighConnections
+        expr: |
+          (
+            pg_stat_database_numbackends
+            /
+            pg_settings_max_connections
+          ) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database connection pool near capacity"
+          description: "Database connections at {{ $value | humanizePercentage }} of maximum"
+          runbook: "https://docs.shivx.io/runbooks/db-connections"
+
+      - alert: DatabaseSlowQueries
+        expr: |
+          rate(pg_stat_statements_mean_time_seconds[5m]) > 1.0
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Average query time is {{ $value }}s"
+          runbook: "https://docs.shivx.io/runbooks/slow-queries"
+
+      - alert: DatabaseReplicationLag
+        expr: |
+          pg_replication_lag_seconds > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database replication lag detected"
+          description: "Replication lag is {{ $value }}s behind primary"
+          runbook: "https://docs.shivx.io/runbooks/replication-lag"
+
+  # ==========================================================================
+  # Security Alerts
+  # ==========================================================================
+  - name: security
+    interval: 30s
+    rules:
+      - alert: GuardianDefenseLockdown
+        expr: guardian_defense_lockdown_active == 1
+        for: 1m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "CRITICAL: Guardian Defense lockdown activated"
+          description: "System detected intrusion attempt and activated lockdown mode"
+          runbook: "https://docs.shivx.io/runbooks/guardian-lockdown"
+
+      - alert: FailedAuthenticationSpike
+        expr: |
+          sum(rate(auth_failures_total[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High rate of failed authentication attempts"
+          description: "{{ $value }} failed auth attempts per second"
+          runbook: "https://docs.shivx.io/runbooks/failed-auth"
+
+      - alert: RateLimitExceeded
+        expr: |
+          sum(rate(rate_limit_exceeded_total[5m])) > 50
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High rate of rate-limit violations"
+          description: "{{ $value }} rate limit violations per second"
+          runbook: "https://docs.shivx.io/runbooks/rate-limit"
+
+      - alert: SuspiciousActivity
+        expr: |
+          sum(rate(security_incident_total[5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "CRITICAL: Suspicious activity detected"
+          description: "{{ $value }} security incidents per second"
+          runbook: "https://docs.shivx.io/runbooks/security-incident"
+
+  # ==========================================================================
+  # Trading System Alerts
+  # ==========================================================================
+  - name: trading
+    interval: 30s
+    rules:
+      - alert: HighTradingLoss
+        expr: |
+          trading_pnl_total_usd < -1000
+        for: 5m
+        labels:
+          severity: critical
+          component: trading
+        annotations:
+          summary: "CRITICAL: High trading losses detected"
+          description: "Trading loss is ${{ $value }}"
+          runbook: "https://docs.shivx.io/runbooks/trading-loss"
+
+      - alert: TradingCircuitBreaker
+        expr: trading_circuit_breaker_active == 1
+        for: 1m
+        labels:
+          severity: warning
+          component: trading
+        annotations:
+          summary: "Trading circuit breaker activated"
+          description: "Trading halted due to circuit breaker"
+          runbook: "https://docs.shivx.io/runbooks/circuit-breaker"
+
+      - alert: FailedTradeExecution
+        expr: |
+          sum(rate(trade_failures_total[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: trading
+        annotations:
+          summary: "High rate of failed trade executions"
+          description: "{{ $value }} failed trades per second"
+          runbook: "https://docs.shivx.io/runbooks/trade-failures"
+
+      - alert: JupiterAPIFailure
+        expr: jupiter_api_success_rate < 0.95
+        for: 5m
+        labels:
+          severity: warning
+          component: trading
+        annotations:
+          summary: "Jupiter API success rate degraded"
+          description: "Jupiter API success rate is {{ $value | humanizePercentage }}"
+          runbook: "https://docs.shivx.io/runbooks/jupiter-api"
+
+  # ==========================================================================
+  # System Resource Alerts
+  # ==========================================================================
+  - name: system_resources
+    interval: 30s
+    rules:
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            process_resident_memory_bytes
+            /
+            (node_memory_MemTotal_bytes or (4 * 1024 * 1024 * 1024))
+          ) > 0.9
+        for: 10m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "CRITICAL: High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+          runbook: "https://docs.shivx.io/runbooks/high-memory"
+
+      - alert: HighCPUUsage
+        expr: |
+          (
+            rate(process_cpu_seconds_total[5m]) * 100
+          ) > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+          runbook: "https://docs.shivx.io/runbooks/high-cpu"
+
+      - alert: LowDiskSpace
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/"}
+            /
+            node_filesystem_size_bytes{mountpoint="/"}
+          ) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "CRITICAL: Low disk space"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+          runbook: "https://docs.shivx.io/runbooks/low-disk"
+
+      - alert: DiskSpaceWarning
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/"}
+            /
+            node_filesystem_size_bytes{mountpoint="/"}
+          ) < 0.2
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "Disk space running low"
+          description: "{{ $value | humanizePercentage }} disk space remaining"
+          runbook: "https://docs.shivx.io/runbooks/low-disk"
+
+  # ==========================================================================
+  # Service Health Alerts
+  # ==========================================================================
+  - name: service_health
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job="shivx"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: service
+        annotations:
+          summary: "CRITICAL: ShivX service is down"
+          description: "ShivX application is not responding to health checks"
+          runbook: "https://docs.shivx.io/runbooks/service-down"
+
+      - alert: ServiceNotReady
+        expr: health_ready{job="shivx"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: service
+        annotations:
+          summary: "Service not ready"
+          description: "ShivX application failed readiness check"
+          runbook: "https://docs.shivx.io/runbooks/not-ready"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "CRITICAL: Redis is down"
+          description: "Redis cache is unreachable"
+          runbook: "https://docs.shivx.io/runbooks/redis-down"
+
+      - alert: HighRestartRate
+        expr: |
+          sum(rate(container_restart_total[15m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: service
+        annotations:
+          summary: "Service restarting frequently"
+          description: "Service has restarted {{ $value }} times in last 15 minutes"
+          runbook: "https://docs.shivx.io/runbooks/restart-loop"
+
+  # ==========================================================================
+  # ML Model Alerts
+  # ==========================================================================
+  - name: ml_models
+    interval: 60s
+    rules:
+      - alert: MLModelInferenceSlowdown
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(ml_inference_duration_seconds_bucket[5m])) by (le)
+          ) > 2.0
+        for: 10m
+        labels:
+          severity: warning
+          component: ml
+        annotations:
+          summary: "ML model inference is slow"
+          description: "P95 inference time is {{ $value }}s (threshold: 2s)"
+          runbook: "https://docs.shivx.io/runbooks/slow-inference"
+
+      - alert: MLModelPredictionFailure
+        expr: |
+          sum(rate(ml_prediction_errors_total[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: ml
+        annotations:
+          summary: "ML model prediction failures"
+          description: "{{ $value }} prediction errors per second"
+          runbook: "https://docs.shivx.io/runbooks/prediction-errors"
+
+      - alert: MLModelNotLoaded
+        expr: ml_models_loaded_total == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: ml
+        annotations:
+          summary: "CRITICAL: No ML models loaded"
+          description: "ML models failed to load at startup"
+          runbook: "https://docs.shivx.io/runbooks/models-not-loaded"
+
+# ============================================================================

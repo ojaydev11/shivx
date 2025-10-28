@@ -1,0 +1,196 @@
+# ============================================================================
+# Promtail Configuration for ShivX Log Collection
+# ============================================================================
+# Promtail is an agent which ships the contents of local logs to Loki
+# ============================================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+# Positions file to track log positions
+positions:
+  filename: /tmp/positions.yaml
+
+# Loki client configuration
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+# Scrape configurations
+scrape_configs:
+  # ==========================================================================
+  # Docker Container Logs
+  # ==========================================================================
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["com.docker.compose.project=shivx"]
+
+    relabel_configs:
+      # Container name
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+
+      # Container ID
+      - source_labels: ['__meta_docker_container_id']
+        target_label: 'container_id'
+
+      # Docker image
+      - source_labels: ['__meta_docker_container_image']
+        target_label: 'image'
+
+      # Docker labels
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+
+      # Log stream
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
+
+    # Pipeline stages for log processing
+    pipeline_stages:
+      # Parse JSON logs
+      - json:
+          expressions:
+            level: level
+            timestamp: timestamp
+            message: message
+            logger: logger
+
+      # Extract timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+
+      # Add log level labels
+      - labels:
+          level:
+          logger:
+
+      # Parse multiline logs (e.g., stack traces)
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}'
+          max_wait_time: 3s
+
+  # ==========================================================================
+  # System Logs
+  # ==========================================================================
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system_logs
+          __path__: /var/log/*.log
+
+  # ==========================================================================
+  # Nginx Access Logs
+  # ==========================================================================
+  - job_name: nginx_access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          log_type: access
+          __path__: /var/log/nginx/access.log
+
+    pipeline_stages:
+      # Parse nginx access log format
+      - regex:
+          expression: '^(?P<remote_addr>[\d\.]+) - (?P<remote_user>[^ ]+) \[(?P<time_local>[^\]]+)\] "(?P<method>\w+) (?P<path>[^ ]+) (?P<protocol>[^"]+)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)".*'
+
+      # Add labels
+      - labels:
+          method:
+          status:
+          path:
+
+      # Add metrics
+      - metrics:
+          request_duration_seconds:
+            type: Histogram
+            description: "Request duration in seconds"
+            source: request_time
+            config:
+              buckets: [0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0]
+
+  # ==========================================================================
+  # Nginx Error Logs
+  # ==========================================================================
+  - job_name: nginx_error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          log_type: error
+          __path__: /var/log/nginx/error.log
+
+  # ==========================================================================
+  # PostgreSQL Logs
+  # ==========================================================================
+  - job_name: postgres
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: postgres
+          __path__: /var/lib/postgresql/logs/*.log
+
+    pipeline_stages:
+      # Parse PostgreSQL log format
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+) \[(?P<pid>\d+)\].*?(?P<level>\w+):  (?P<message>.*)'
+
+      - labels:
+          level:
+          pid:
+
+  # ==========================================================================
+  # ShivX Application Logs (JSON structured)
+  # ==========================================================================
+  - job_name: shivx_app
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: shivx
+          __path__: /app/logs/shivx.log
+
+    pipeline_stages:
+      # Parse JSON structured logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            logger: logger
+            message: message
+            module: module
+            function: function
+            user_id: user_id
+            request_id: request_id
+            duration_ms: duration_ms
+
+      # Extract timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+
+      # Add labels
+      - labels:
+          level:
+          logger:
+          module:
+
+      # Drop debug logs in production (optional)
+      # - drop:
+      #     source: level
+      #     expression: "DEBUG"
+
+# ============================================================================

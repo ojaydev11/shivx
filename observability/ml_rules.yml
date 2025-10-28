@@ -1,0 +1,62 @@
+# ML-specific recording and alerting rules
+
+groups:
+  - name: ml_model_performance
+    interval: 30s
+    rules:
+      # Model prediction rate
+      - record: ml:prediction_rate:5m
+        expr: rate(ml_predictions_total[5m])
+
+      # Model latency percentiles
+      - record: ml:prediction_latency:p95
+        expr: histogram_quantile(0.95, rate(ml_prediction_latency_seconds_bucket[5m]))
+
+      - record: ml:prediction_latency:p99
+        expr: histogram_quantile(0.99, rate(ml_prediction_latency_seconds_bucket[5m]))
+
+      # Model accuracy (when available)
+      - record: ml:model_accuracy:avg
+        expr: avg(ml_model_accuracy) by (model_id)
+
+  - name: ml_alerts
+    rules:
+      # Alert if prediction latency is high
+      - alert: HighPredictionLatency
+        expr: ml:prediction_latency:p95 > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High ML prediction latency detected"
+          description: "P95 latency is {{ $value }}s (threshold: 0.5s)"
+
+      # Alert if model accuracy drops
+      - alert: ModelAccuracyDegradation
+        expr: ml:model_accuracy:avg < 0.75
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Model accuracy below threshold"
+          description: "Model {{ $labels.model_id }} accuracy is {{ $value }} (threshold: 0.75)"
+
+      # Alert if drift detected
+      - alert: DataDriftDetected
+        expr: ml_drift_score > 0.25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Data drift detected"
+          description: "Drift score {{ $value }} for {{ $labels.feature }} (threshold: 0.25)"
+
+      # Alert if prediction rate drops
+      - alert: LowPredictionRate
+        expr: ml:prediction_rate:5m < 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ML prediction rate dropped"
+          description: "Prediction rate is {{ $value }}/s (threshold: 1/s)"

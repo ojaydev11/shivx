@@ -1,0 +1,213 @@
+version: '3.8'
+
+services:
+  # =============================================================================
+  # PostgreSQL Database
+  # =============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: shivx-postgres
+    environment:
+      POSTGRES_DB: shivx_db
+      POSTGRES_USER: shivx_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shivx_secure_password_change_in_production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shivx_user -d shivx_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shivx-network
+
+  # =============================================================================
+  # Redis Cache & Message Queue
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: shivx-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secure_password}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shivx-network
+
+  # =============================================================================
+  # MLflow Tracking Server
+  # =============================================================================
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.9.2
+    container_name: shivx-mlflow
+    command: >
+      mlflow server
+      --backend-store-uri postgresql://shivx_user:${POSTGRES_PASSWORD:-shivx_secure_password_change_in_production}@postgres:5432/mlflow_db
+      --default-artifact-root /mlflow/artifacts
+      --host 0.0.0.0
+      --port 5000
+    environment:
+      - MLFLOW_TRACKING_URI=http://0.0.0.0:5000
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - shivx-network
+
+  # =============================================================================
+  # Celery Worker (ML Inference)
+  # =============================================================================
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shivx-celery-worker
+    command: celery -A app.ml.inference worker --loglevel=info --concurrency=4
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - DATABASE_URL=postgresql://shivx_user:${POSTGRES_PASSWORD:-shivx_secure_password_change_in_production}@postgres:5432/shivx_db
+    volumes:
+      - ./app:/app/app
+      - model_cache:/tmp/model_cache
+    depends_on:
+      - redis
+      - mlflow
+      - postgres
+    networks:
+      - shivx-network
+
+  # =============================================================================
+  # Celery Beat (Scheduled Tasks)
+  # =============================================================================
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shivx-celery-beat
+    command: celery -A app.ml.inference beat --loglevel=info
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      - redis
+      - mlflow
+    networks:
+      - shivx-network
+
+  # =============================================================================
+  # Prometheus (Metrics)
+  # =============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: shivx-prometheus
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    networks:
+      - shivx-network
+
+  # =============================================================================
+  # Grafana (Dashboards)
+  # =============================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: shivx-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin_change_in_production}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./observability/grafana/datasources:/etc/grafana/provisioning/datasources
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - shivx-network
+
+  # =============================================================================
+  # FastAPI Application
+  # =============================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shivx-api
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      - DATABASE_URL=postgresql://shivx_user:${POSTGRES_PASSWORD:-shivx_secure_password_change_in_production}@postgres:5432/shivx_db
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - ENVIRONMENT=production
+    volumes:
+      - ./:/app
+      - model_cache:/tmp/model_cache
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - shivx-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  mlflow_artifacts:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  model_cache:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  shivx-network:
+    driver: bridge
