@@ -1,0 +1,148 @@
+# ============================================================================
+# ShivX AI Trading System - Production Dependencies
+# ============================================================================
+# Generated: 2025-10-28
+# Python version: >=3.10,<3.13
+#
+# Installation:
+#   pip install -r requirements.txt
+#
+# For development:
+#   pip install -r requirements.txt -r requirements-dev.txt
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Core Web Framework
+# ----------------------------------------------------------------------------
+fastapi==0.109.0                # Modern async web framework
+uvicorn[standard]==0.27.0       # ASGI server with performance extras
+pydantic==2.5.3                 # Data validation and settings
+pydantic-settings==2.1.0        # Settings management
+python-multipart==0.0.6         # Form data parsing
+
+# ----------------------------------------------------------------------------
+# HTTP & Networking
+# ----------------------------------------------------------------------------
+httpx==0.26.0                   # Async HTTP client
+aiohttp==3.9.1                  # Alternative async HTTP client
+requests==2.31.0                # Synchronous HTTP client (legacy support)
+
+# ----------------------------------------------------------------------------
+# Security & Cryptography
+# ----------------------------------------------------------------------------
+cryptography==42.0.0            # Encryption, key derivation (Fernet, DPAPI fallback)
+python-jose[cryptography]==3.3.0  # JWT tokens
+passlib[bcrypt]==1.7.4          # Password hashing
+bcrypt==4.1.2                   # Bcrypt algorithm
+python-dotenv==1.0.0            # Environment variable management
+
+# ----------------------------------------------------------------------------
+# Database & ORM
+# ----------------------------------------------------------------------------
+sqlalchemy==2.0.25              # SQL toolkit and ORM
+alembic==1.13.1                 # Database migrations
+asyncpg==0.29.0                 # Async PostgreSQL driver
+psycopg2-binary==2.9.9          # PostgreSQL driver (sync)
+# aiosqlite==0.19.0             # Async SQLite driver (uncomment if needed)
+
+# ----------------------------------------------------------------------------
+# Caching & Message Queue
+# ----------------------------------------------------------------------------
+redis==5.0.1                    # Redis client
+aioredis==2.0.1                 # Async Redis client
+
+# ----------------------------------------------------------------------------
+# AI/ML Core Libraries
+# ----------------------------------------------------------------------------
+torch==2.1.2                    # PyTorch deep learning
+torchvision==0.16.2             # PyTorch vision models
+# tensorflow==2.15.0            # TensorFlow (uncomment if needed, large dependency)
+numpy==1.26.3                   # Numerical computing
+pandas==2.1.4                   # Data manipulation
+scikit-learn==1.4.0             # Machine learning algorithms
+
+# ----------------------------------------------------------------------------
+# Reinforcement Learning
+# ----------------------------------------------------------------------------
+gymnasium==0.29.1               # RL environments (formerly gym)
+stable-baselines3==2.2.1        # RL algorithms (PPO, A2C, etc.)
+
+# ----------------------------------------------------------------------------
+# NLP & Sentiment Analysis
+# ----------------------------------------------------------------------------
+# transformers==4.36.2          # HuggingFace transformers (uncomment if needed)
+# sentencepiece==0.1.99         # Tokenization (transformers dependency)
+
+# ----------------------------------------------------------------------------
+# Data Processing & Analysis
+# ----------------------------------------------------------------------------
+scipy==1.11.4                   # Scientific computing
+matplotlib==3.8.2               # Plotting (for analysis)
+seaborn==0.13.1                 # Statistical visualization
+
+# ----------------------------------------------------------------------------
+# Monitoring & Observability
+# ----------------------------------------------------------------------------
+prometheus-client==0.19.0       # Prometheus metrics
+opentelemetry-api==1.22.0       # Distributed tracing
+opentelemetry-sdk==1.22.0       # OpenTelemetry SDK
+opentelemetry-instrumentation-fastapi==0.43b0  # FastAPI instrumentation
+# sentry-sdk[fastapi]==1.39.2   # Error tracking (uncomment for production)
+
+# ----------------------------------------------------------------------------
+# Task Scheduling & Background Jobs
+# ----------------------------------------------------------------------------
+schedule==1.2.1                 # Job scheduling
+celery==5.3.4                   # Distributed task queue (optional)
+
+# ----------------------------------------------------------------------------
+# Utilities
+# ----------------------------------------------------------------------------
+python-dateutil==2.8.2          # Date/time utilities
+pytz==2024.1                    # Timezone support
+pyyaml==6.0.1                   # YAML parsing
+toml==0.10.2                    # TOML parsing
+click==8.1.7                    # CLI framework
+rich==13.7.0                    # Terminal formatting
+psutil==5.9.7                   # System monitoring
+
+# ----------------------------------------------------------------------------
+# Rate Limiting
+# ----------------------------------------------------------------------------
+slowapi==0.1.9                  # Rate limiting for FastAPI
+limits==3.7.0                   # Rate limiting library
+
+# ----------------------------------------------------------------------------
+# Data Validation & Serialization
+# ----------------------------------------------------------------------------
+marshmallow==3.20.1             # Object serialization
+jsonschema==4.20.0              # JSON schema validation
+
+# ----------------------------------------------------------------------------
+# Blockchain & Crypto (Solana)
+# ----------------------------------------------------------------------------
+solana==0.30.2                  # Solana Python SDK
+# solders==0.18.1               # Solana Rust bindings (if needed)
+
+# ----------------------------------------------------------------------------
+# External API Clients
+# ----------------------------------------------------------------------------
+# openai==1.7.2                 # OpenAI API client (uncomment if needed)
+# anthropic==0.8.1              # Anthropic Claude API (uncomment if needed)
+
+# ----------------------------------------------------------------------------
+# Development & Testing (minimal, see requirements-dev.txt for full list)
+# ----------------------------------------------------------------------------
+pytest==7.4.4                   # Testing framework
+pytest-asyncio==0.23.3          # Async test support
+pytest-cov==4.1.0               # Coverage reporting
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# - Pin major versions to prevent breaking changes
+# - Update regularly with: pip install --upgrade -r requirements.txt
+# - Run security audit with: pip-audit
+# - Check for outdated packages: pip list --outdated
+# - For GPU support, install: torch with CUDA support
+# ============================================================================

@@ -687,7 +687,14 @@ class SecurityHardeningEngine:
 # ========== Testing Functions ==========
 
 async def test_security_hardening():
-    """Test security hardening capabilities"""
+    """
+    Test security hardening capabilities
+
+    NOTE: For security testing, use environment variables or the test suite in tests/test_security_hardening.py
+    This demo uses environment variables with safe defaults for demonstration only.
+    """
+    import os
+
     print("\n" + "="*60)
     print("Testing Security Hardening Engine")
     print("="*60)
@@ -726,16 +733,20 @@ async def test_security_hardening():
     # Test 3: User Authentication
     print("\n3. Testing user authentication...")
 
+    # Use environment variables for credentials (safe for demo)
+    test_username = os.getenv("SHIVX_DEMO_USERNAME", "demo_user")
+    test_password = os.getenv("SHIVX_DEMO_PASSWORD", "demo_password_secure_456")
+
     # Create user
     user = engine.auth.create_user(
-        "test_user",
-        "secure_password_123",
+        test_username,
+        test_password,
         permissions={Permission.READ, Permission.WRITE},
     )
     print(f"  Created user: {user.username} (ID: {user.user_id})")
 
     # Authenticate
-    session_token = engine.auth.authenticate_user("test_user", "secure_password_123")
+    session_token = engine.auth.authenticate_user(test_username, test_password)
     print(f"  Authenticated: {'PASS' if session_token else 'FAIL'}")
 
     # Validate session
@@ -743,7 +754,7 @@ async def test_security_hardening():
     print(f"  Session valid: {'PASS' if user_id else 'FAIL'}")
 
     # Wrong password
-    failed_token = engine.auth.authenticate_user("test_user", "wrong_password")
+    failed_token = engine.auth.authenticate_user(test_username, "intentionally_wrong_password")
     print(f"  Wrong password rejected: {'PASS' if not failed_token else 'FAIL'}")
 
     # Test 4: API Keys

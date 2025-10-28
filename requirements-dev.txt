@@ -1,0 +1,113 @@
+# ============================================================================
+# ShivX AI Trading System - Development Dependencies
+# ============================================================================
+# Install with: pip install -r requirements.txt -r requirements-dev.txt
+# ============================================================================
+
+# First, install production dependencies
+-r requirements.txt
+
+# ----------------------------------------------------------------------------
+# Testing
+# ----------------------------------------------------------------------------
+pytest==7.4.4                   # Testing framework
+pytest-asyncio==0.23.3          # Async test support
+pytest-cov==4.1.0               # Coverage reporting
+pytest-mock==3.12.0             # Mocking
+pytest-xdist==3.5.0             # Parallel test execution
+pytest-timeout==2.2.0           # Test timeouts
+pytest-benchmark==4.0.0         # Performance benchmarking
+hypothesis==6.96.1              # Property-based testing
+faker==22.0.0                   # Fake data generation
+
+# ----------------------------------------------------------------------------
+# Code Quality & Linting
+# ----------------------------------------------------------------------------
+black==23.12.1                  # Code formatter
+isort==5.13.2                   # Import sorter
+flake8==7.0.0                   # Linter
+flake8-docstrings==1.7.0        # Docstring linter
+flake8-bugbear==23.12.2         # Additional checks
+mypy==1.8.0                     # Static type checker
+pylint==3.0.3                   # Comprehensive linter
+bandit==1.7.6                   # Security linter
+safety==2.3.5                   # Dependency security checker
+pip-audit==2.6.3                # Audit pip packages
+
+# ----------------------------------------------------------------------------
+# Type Stubs
+# ----------------------------------------------------------------------------
+types-requests==2.31.0.20231231
+types-PyYAML==6.0.12.12
+types-python-dateutil==2.8.19.14
+types-redis==4.6.0.20240106
+
+# ----------------------------------------------------------------------------
+# Documentation
+# ----------------------------------------------------------------------------
+mkdocs==1.5.3                   # Documentation generator
+mkdocs-material==9.5.3          # Material theme
+mkdocstrings[python]==0.24.0    # Auto-generate docs from code
+pdoc==14.3.0                    # Alternative doc generator
+
+# ----------------------------------------------------------------------------
+# Debugging & Profiling
+# ----------------------------------------------------------------------------
+ipython==8.19.0                 # Enhanced Python shell
+ipdb==0.13.13                   # IPython debugger
+line-profiler==4.1.1            # Line-by-line profiling
+memory-profiler==0.61.0         # Memory profiling
+py-spy==0.3.14                  # Sampling profiler
+
+# ----------------------------------------------------------------------------
+# Development Tools
+# ----------------------------------------------------------------------------
+pre-commit==3.6.0               # Git hooks framework
+detect-secrets==1.4.0           # Prevent secrets in commits
+gitpython==3.1.41               # Git automation
+watchdog==3.0.0                 # File system monitoring
+python-decouple==3.8            # Settings management
+
+# ----------------------------------------------------------------------------
+# API Development & Testing
+# ----------------------------------------------------------------------------
+httpie==3.2.2                   # HTTP client for API testing
+locust==2.20.1                  # Load testing
+faker==22.0.0                   # Fake data for testing
+
+# ----------------------------------------------------------------------------
+# Database Tools
+# ----------------------------------------------------------------------------
+# pgcli==4.0.1                  # PostgreSQL CLI (uncomment if using Postgres)
+
+# ----------------------------------------------------------------------------
+# Code Coverage & Reporting
+# ----------------------------------------------------------------------------
+coverage[toml]==7.4.0           # Coverage measurement
+coverage-badge==1.1.0           # Generate coverage badge
+
+# ----------------------------------------------------------------------------
+# Notebook & Interactive Development
+# ----------------------------------------------------------------------------
+jupyter==1.0.0                  # Jupyter notebooks
+jupyterlab==4.0.10              # JupyterLab
+notebook==7.0.6                 # Classic notebook
+
+# ----------------------------------------------------------------------------
+# Build & Packaging
+# ----------------------------------------------------------------------------
+build==1.0.3                    # PEP 517 build
+twine==4.0.2                    # Package upload to PyPI
+wheel==0.42.0                   # Wheel packaging
+
+# ============================================================================
+# DEVELOPMENT WORKFLOW
+# ============================================================================
+# 1. Install: pip install -r requirements-dev.txt
+# 2. Setup pre-commit: pre-commit install
+# 3. Run tests: pytest
+# 4. Check coverage: pytest --cov=core --cov-report=html
+# 5. Format code: black . && isort .
+# 6. Lint: flake8 . && mypy .
+# 7. Security scan: bandit -r . && safety check
+# ============================================================================
