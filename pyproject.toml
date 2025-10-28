@@ -1,0 +1,243 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shivx"
+version = "2.0.0"
+description = "Advanced AI-powered autonomous trading system with reinforcement learning"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = {text = "Proprietary"}
+authors = [
+    {name = "ShivX Development Team", email = "dev@shivx.ai"}
+]
+maintainers = [
+    {name = "ShivX Development Team", email = "dev@shivx.ai"}
+]
+keywords = [
+    "trading",
+    "ai",
+    "reinforcement-learning",
+    "solana",
+    "dex",
+    "algorithmic-trading",
+    "machine-learning",
+    "autonomous-systems"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    # Web Framework
+    "fastapi>=0.109.0,<0.110.0",
+    "uvicorn[standard]>=0.27.0,<0.28.0",
+    "pydantic>=2.5.3,<3.0.0",
+    "pydantic-settings>=2.1.0,<3.0.0",
+    "python-multipart>=0.0.6",
+
+    # HTTP & Networking
+    "httpx>=0.26.0,<0.27.0",
+    "aiohttp>=3.9.1,<4.0.0",
+    "requests>=2.31.0,<3.0.0",
+
+    # Security
+    "cryptography>=42.0.0,<43.0.0",
+    "python-jose[cryptography]>=3.3.0,<4.0.0",
+    "passlib[bcrypt]>=1.7.4,<2.0.0",
+    "bcrypt>=4.1.2,<5.0.0",
+    "python-dotenv>=1.0.0,<2.0.0",
+
+    # Database
+    "sqlalchemy>=2.0.25,<3.0.0",
+    "alembic>=1.13.1,<2.0.0",
+    "asyncpg>=0.29.0,<0.30.0",
+    "psycopg2-binary>=2.9.9,<3.0.0",
+
+    # Cache
+    "redis>=5.0.1,<6.0.0",
+
+    # AI/ML
+    "torch>=2.1.2,<2.2.0",
+    "torchvision>=0.16.2,<0.17.0",
+    "numpy>=1.26.3,<2.0.0",
+    "pandas>=2.1.4,<3.0.0",
+    "scikit-learn>=1.4.0,<2.0.0",
+
+    # RL
+    "gymnasium>=0.29.1,<0.30.0",
+    "stable-baselines3>=2.2.1,<3.0.0",
+
+    # Data Science
+    "scipy>=1.11.4,<2.0.0",
+
+    # Monitoring
+    "prometheus-client>=0.19.0,<0.20.0",
+    "opentelemetry-api>=1.22.0,<2.0.0",
+    "opentelemetry-sdk>=1.22.0,<2.0.0",
+    "opentelemetry-instrumentation-fastapi>=0.43,<0.44",
+
+    # Task Scheduling
+    "schedule>=1.2.1,<2.0.0",
+
+    # Utilities
+    "python-dateutil>=2.8.2,<3.0.0",
+    "pytz>=2024.1",
+    "pyyaml>=6.0.1,<7.0.0",
+    "click>=8.1.7,<9.0.0",
+    "psutil>=5.9.7,<6.0.0",
+
+    # Rate Limiting
+    "slowapi>=0.1.9,<0.2.0",
+    "limits>=3.7.0,<4.0.0",
+
+    # Blockchain
+    "solana>=0.30.2,<0.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest>=7.4.4,<8.0.0",
+    "pytest-asyncio>=0.23.3,<0.24.0",
+    "pytest-cov>=4.1.0,<5.0.0",
+    "pytest-mock>=3.12.0,<4.0.0",
+    "pytest-xdist>=3.5.0,<4.0.0",
+    "hypothesis>=6.96.1,<7.0.0",
+    "faker>=22.0.0,<23.0.0",
+
+    # Code Quality
+    "black>=23.12.1,<24.0.0",
+    "isort>=5.13.2,<6.0.0",
+    "flake8>=7.0.0,<8.0.0",
+    "mypy>=1.8.0,<2.0.0",
+    "pylint>=3.0.3,<4.0.0",
+    "bandit>=1.7.6,<2.0.0",
+    "safety>=2.3.5,<3.0.0",
+    "pip-audit>=2.6.3,<3.0.0",
+
+    # Documentation
+    "mkdocs>=1.5.3,<2.0.0",
+    "mkdocs-material>=9.5.3,<10.0.0",
+
+    # Debugging
+    "ipython>=8.19.0,<9.0.0",
+    "ipdb>=0.13.13,<0.14.0",
+
+    # Tools
+    "pre-commit>=3.6.0,<4.0.0",
+]
+
+gpu = [
+    "torch>=2.1.2+cu118",
+]
+
+all = [
+    "shivx[dev,gpu]",
+]
+
+[project.urls]
+Homepage = "https://shivx.ai"
+Documentation = "https://docs.shivx.ai"
+Repository = "https://github.com/ojaydev11/shivx"
+"Bug Tracker" = "https://github.com/ojaydev11/shivx/issues"
+
+[project.scripts]
+shivx = "main:main"
+
+[tool.setuptools]
+packages = ["app", "core", "utils", "security", "config"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.yml", "*.json", "*.txt"]
+
+# ============================================================================
+# Tool Configurations
+# ============================================================================
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --cov=core --cov=app --cov=utils"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["core", "app", "utils"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311', 'py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | \.eggs
+  | \.tox
+  | build
+  | dist
+  | __pycache__
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+follow_imports = "normal"
+ignore_missing_imports = true
+
+[tool.pylint.messages_control]
+disable = [
+    "C0330", "C0326",  # Formatting (handled by black)
+    "too-few-public-methods",
+    "too-many-instance-attributes",
+    "too-many-arguments",
+    "too-many-locals",
+]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.bandit]
+exclude_dirs = ["/tests", "/venv", "/.venv"]
+skips = ["B101", "B601"]  # assert_used, subprocess
+
+[tool.bandit.assert_used]
+skips = ["*/test_*.py"]
