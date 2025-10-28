@@ -12,7 +12,7 @@ Coordinates:
 import time
 from datetime import datetime
 from threading import Event, Thread
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from loguru import logger
 

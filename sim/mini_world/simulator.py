@@ -2,7 +2,7 @@
 Minimal gridworld simulator for spatial reasoning.
 """
 
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from loguru import logger
