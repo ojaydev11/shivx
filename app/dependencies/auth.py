@@ -99,26 +99,65 @@ async def get_current_user(
     settings: Settings = Depends(get_settings)
 ) -> TokenData:
     """
-    Get current authenticated user from JWT token
+    Get current authenticated user from JWT token.
+
+    CRITICAL SECURITY: This function enforces authentication for all protected endpoints.
+    The skip_auth bypass is ONLY available in local/development environments and is
+    automatically blocked in production/staging by the Settings validator.
 
     Args:
-        credentials: HTTP Bearer token
-        settings: Application settings
+        credentials: HTTP Bearer token from Authorization header
+        settings: Application settings (with security validation)
 
     Returns:
-        TokenData with user info
+        TokenData with user_id and permissions
 
     Raises:
-        HTTPException: If not authenticated
+        HTTPException: If not authenticated or token is invalid
+
+    Security Notes:
+        - skip_auth bypass is logged with WARNING level
+        - skip_auth is blocked in production/staging by Settings validator
+        - Even if skip_auth is somehow True, we check environment again
+        - All authentication events should be audited
     """
-    # Check if authentication is disabled (dev only)
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # CRITICAL SECURITY: Check if authentication bypass is enabled
+    # This should NEVER be True in production (blocked by Settings validator)
     if settings.skip_auth:
+        # Double-check environment as defense in depth
+        # This should never trigger because Settings validator blocks it,
+        # but we add this as an additional safety layer
+        if settings.env in ("production", "staging"):
+            logger.critical(
+                "SECURITY VIOLATION: skip_auth is True in %s environment! "
+                "This should be impossible due to Settings validator. "
+                "Possible configuration override or validator bypass.",
+                settings.env
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Security configuration error - authentication required",
+            )
+
+        # Log warning about authentication bypass (even in dev)
+        logger.warning(
+            "AUTHENTICATION BYPASS: skip_auth is enabled. "
+            "All requests granted ADMIN access without authentication. "
+            "Environment: %s. This is ONLY safe for local development.",
+            settings.env
+        )
+
         # Return mock user for development
         return TokenData(
             user_id="dev_user",
             permissions={Permission.ADMIN}  # Full access in dev mode
         )
 
+    # Normal authentication flow - require credentials
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

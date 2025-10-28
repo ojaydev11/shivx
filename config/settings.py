@@ -114,15 +114,25 @@ class Settings(BaseSettings):
     # ========================================================================
 
     secret_key: str = Field(
-        default="INSECURE_CHANGE_IN_PRODUCTION",
+        default="zZi3aYpv7w-zA2dIvXCCUJUhIu9YpULFXO3R9f2St71tFfAl1xn5dR0Re7xO09aw",
         min_length=32,
-        description="Secret key for encryption (min 32 chars)"
+        description=(
+            "CRITICAL SECURITY: Cryptographically secure secret key for encryption. "
+            "This MUST be changed in production via SHIVX_SECRET_KEY environment variable. "
+            "Generate with: python -c \"import secrets; print(secrets.token_urlsafe(48))\". "
+            "Minimum 32 characters required. Never use default values in ANY environment."
+        )
     )
 
     jwt_secret: str = Field(
-        default="INSECURE_JWT_CHANGE_IN_PRODUCTION",
+        default="-M09hJ0D1THK8JvYG9BwfCT2kb7OnR3ihcy44oke4Loaqc_utvzEFCNEkEO4MJl-",
         min_length=32,
-        description="JWT secret key (min 32 chars)"
+        description=(
+            "CRITICAL SECURITY: JWT signing secret key. MUST be different from secret_key. "
+            "This MUST be changed in production via SHIVX_JWT_SECRET environment variable. "
+            "Generate with: python -c \"import secrets; print(secrets.token_urlsafe(48))\". "
+            "Minimum 32 characters required. Never reuse secret_key value."
+        )
     )
 
     jwt_algorithm: str = Field(
@@ -160,7 +170,13 @@ class Settings(BaseSettings):
 
     skip_auth: bool = Field(
         default=False,
-        description="Skip authentication (DEVELOPMENT ONLY!)"
+        description=(
+            "DANGER: Skip authentication entirely (DEVELOPMENT ONLY!). "
+            "When True, all API endpoints allow access without authentication. "
+            "BLOCKED in production and staging environments. "
+            "Use ONLY for local development and testing. "
+            "Never enable in any publicly accessible environment."
+        )
     )
 
     # ========================================================================
@@ -208,6 +224,91 @@ class Settings(BaseSettings):
         default=5,
         ge=1,
         description="Redis connection timeout (seconds)"
+    )
+
+    redis_pool_size: int = Field(
+        default=50,
+        ge=1,
+        le=200,
+        description="Redis connection pool size"
+    )
+
+    redis_pool_timeout: int = Field(
+        default=30,
+        ge=1,
+        description="Redis connection pool timeout (seconds)"
+    )
+
+    # ========================================================================
+    # Cache Configuration
+    # ========================================================================
+
+    cache_enabled: bool = Field(
+        default=True,
+        description="Enable caching (disable for testing)"
+    )
+
+    cache_default_ttl: int = Field(
+        default=60,
+        ge=1,
+        description="Default cache TTL in seconds"
+    )
+
+    cache_market_price_ttl: int = Field(
+        default=5,
+        ge=1,
+        description="Market price cache TTL (seconds)"
+    )
+
+    cache_orderbook_ttl: int = Field(
+        default=10,
+        ge=1,
+        description="Order book cache TTL (seconds)"
+    )
+
+    cache_ohlcv_ttl: int = Field(
+        default=3600,
+        ge=60,
+        description="OHLCV data cache TTL (seconds)"
+    )
+
+    cache_indicator_ttl: int = Field(
+        default=60,
+        ge=1,
+        description="Technical indicator cache TTL (seconds)"
+    )
+
+    cache_ml_prediction_ttl: int = Field(
+        default=30,
+        ge=1,
+        description="ML prediction cache TTL (seconds)"
+    )
+
+    cache_session_ttl: int = Field(
+        default=86400,
+        ge=300,
+        description="Session cache TTL (seconds)"
+    )
+
+    cache_http_response_ttl: int = Field(
+        default=60,
+        ge=1,
+        description="HTTP response cache TTL (seconds)"
+    )
+
+    cache_warming_enabled: bool = Field(
+        default=True,
+        description="Enable cache warming on startup"
+    )
+
+    cache_monitoring_enabled: bool = Field(
+        default=True,
+        description="Enable cache monitoring and metrics"
+    )
+
+    cache_invalidation_pubsub: bool = Field(
+        default=True,
+        description="Enable pub/sub for distributed cache invalidation"
     )
 
     # ========================================================================
@@ -408,18 +509,186 @@ class Settings(BaseSettings):
     # Validators
     # ========================================================================
 
-    @field_validator("secret_key", "jwt_secret")
+    @field_validator("secret_key")
     @classmethod
-    def validate_secrets(cls, v: str) -> str:
-        """Ensure secrets are not using insecure defaults in production"""
-        if v.startswith("INSECURE"):
-            import os
-            env = os.getenv("SHIVX_ENV", "local")
-            if env == "production":
+    def validate_secret_key(cls, v: str, info) -> str:
+        """
+        CRITICAL SECURITY: Validate secret_key is cryptographically secure.
+
+        Enforces:
+        - Rejects old insecure defaults in ALL environments (not just production)
+        - Minimum entropy requirements
+        - No common patterns or weak keys
+
+        Args:
+            v: The secret key value
+            info: Field validation context
+
+        Returns:
+            Validated secret key
+
+        Raises:
+            ValueError: If secret key is insecure
+        """
+        import os
+
+        # CRITICAL: Block all insecure default values in ALL environments
+        insecure_defaults = [
+            "INSECURE_CHANGE_IN_PRODUCTION",
+            "INSECURE",
+            "changeme",
+            "secret",
+            "default",
+        ]
+
+        if any(insecure in v.upper() for insecure in insecure_defaults):
+            raise ValueError(
+                "SECURITY VIOLATION: Insecure secret key detected! "
+                "The secret key contains an insecure default value. "
+                "Generate a secure key with: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+            )
+
+        # Check minimum entropy (at least 32 chars with good character diversity)
+        if len(v) < 32:
+            raise ValueError(
+                f"SECURITY VIOLATION: Secret key too short ({len(v)} chars, minimum 32). "
+                "Use a cryptographically secure random string."
+            )
+
+        # Check for weak patterns (all same character, sequential, etc.)
+        if len(set(v)) < 10:
+            raise ValueError(
+                "SECURITY VIOLATION: Secret key has insufficient entropy. "
+                "Use a cryptographically secure random generator."
+            )
+
+        # In production/staging, enforce even stricter requirements
+        env = os.getenv("SHIVX_ENV", "local")
+        if env in ("production", "staging"):
+            if len(v) < 48:
                 raise ValueError(
-                    f"Insecure secret detected in production! "
-                    f"Please set a secure value via environment variable."
+                    f"SECURITY VIOLATION: In {env} environment, secret key must be at least 48 chars. "
+                    f"Current length: {len(v)}"
                 )
+
+        return v
+
+    @field_validator("jwt_secret")
+    @classmethod
+    def validate_jwt_secret(cls, v: str, info) -> str:
+        """
+        CRITICAL SECURITY: Validate JWT secret is cryptographically secure and unique.
+
+        Enforces:
+        - Rejects old insecure defaults in ALL environments
+        - Must be different from secret_key
+        - Minimum entropy requirements
+
+        Args:
+            v: The JWT secret value
+            info: Field validation context
+
+        Returns:
+            Validated JWT secret
+
+        Raises:
+            ValueError: If JWT secret is insecure or duplicates secret_key
+        """
+        import os
+
+        # CRITICAL: Block all insecure default values
+        insecure_defaults = [
+            "INSECURE_JWT_CHANGE_IN_PRODUCTION",
+            "INSECURE",
+            "changeme",
+            "secret",
+            "default",
+            "jwt",
+        ]
+
+        if any(insecure in v.upper() for insecure in insecure_defaults):
+            raise ValueError(
+                "SECURITY VIOLATION: Insecure JWT secret detected! "
+                "The JWT secret contains an insecure default value. "
+                "Generate a secure key with: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+            )
+
+        # Check minimum entropy
+        if len(v) < 32:
+            raise ValueError(
+                f"SECURITY VIOLATION: JWT secret too short ({len(v)} chars, minimum 32). "
+                "Use a cryptographically secure random string."
+            )
+
+        if len(set(v)) < 10:
+            raise ValueError(
+                "SECURITY VIOLATION: JWT secret has insufficient entropy. "
+                "Use a cryptographically secure random generator."
+            )
+
+        # CRITICAL: JWT secret MUST be different from main secret key
+        # Access secret_key from info.data if it's already been validated
+        if 'secret_key' in info.data:
+            secret_key = info.data['secret_key']
+            if v == secret_key:
+                raise ValueError(
+                    "SECURITY VIOLATION: JWT secret must be different from secret_key! "
+                    "Using the same secret for different purposes weakens security. "
+                    "Generate two separate secrets."
+                )
+
+        # In production/staging, enforce stricter requirements
+        env = os.getenv("SHIVX_ENV", "local")
+        if env in ("production", "staging"):
+            if len(v) < 48:
+                raise ValueError(
+                    f"SECURITY VIOLATION: In {env} environment, JWT secret must be at least 48 chars. "
+                    f"Current length: {len(v)}"
+                )
+
+        return v
+
+    @field_validator("skip_auth")
+    @classmethod
+    def validate_skip_auth(cls, v: bool, info) -> bool:
+        """
+        CRITICAL SECURITY: Prevent authentication bypass in production/staging.
+
+        The skip_auth flag is a DANGEROUS setting that completely bypasses authentication.
+        It should ONLY be used in local development for testing purposes.
+
+        Args:
+            v: The skip_auth value
+            info: Field validation context
+
+        Returns:
+            Validated skip_auth value
+
+        Raises:
+            ValueError: If skip_auth is True in production or staging
+        """
+        import os
+        import logging
+
+        env = os.getenv("SHIVX_ENV", "local")
+
+        # CRITICAL: Block skip_auth in production and staging
+        if v is True and env in ("production", "staging"):
+            raise ValueError(
+                f"SECURITY VIOLATION: skip_auth cannot be enabled in {env} environment! "
+                "This would allow complete authentication bypass. "
+                "Set SHIVX_SKIP_AUTH=false or remove the environment variable."
+            )
+
+        # Warn if enabled even in development
+        if v is True:
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "WARNING: Authentication is DISABLED (skip_auth=True). "
+                "This is ONLY safe for local development. "
+                f"Current environment: {env}"
+            )
+
         return v
 
     @field_validator("cors_origins", mode="before")

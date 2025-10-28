@@ -7,7 +7,6 @@ import pytest
 from core.security.hardening import (
     SecurityHardeningEngine,
     Permission,
-    InputType,
 )
 
 
@@ -25,7 +24,7 @@ class TestInputValidation:
         ]
 
         for email in valid_emails:
-            assert engine.validator.validate_input(email, InputType.EMAIL), \
+            assert engine.validator.validate_input(email, "email"), \
                 f"Email {email} should be valid"
 
     def test_email_validation_invalid(self):
@@ -40,7 +39,7 @@ class TestInputValidation:
         ]
 
         for email in invalid_emails:
-            assert not engine.validator.validate_input(email, InputType.EMAIL), \
+            assert not engine.validator.validate_input(email, "email"), \
                 f"Email {email} should be invalid"
 
     def test_username_validation(self):
@@ -48,14 +47,14 @@ class TestInputValidation:
         engine = SecurityHardeningEngine()
 
         # Valid usernames
-        assert engine.validator.validate_input("validuser", InputType.USERNAME)
-        assert engine.validator.validate_input("user_123", InputType.USERNAME)
-        assert engine.validator.validate_input("user-name", InputType.USERNAME)
+        assert engine.validator.validate_input("validuser", "username")
+        assert engine.validator.validate_input("user_123", "username")
+        assert engine.validator.validate_input("user-name", "username")
 
         # Invalid usernames
-        assert not engine.validator.validate_input("ab", InputType.USERNAME)  # Too short
-        assert not engine.validator.validate_input("user@name", InputType.USERNAME)  # Invalid char
-        assert not engine.validator.validate_input("a" * 50, InputType.USERNAME)  # Too long
+        assert not engine.validator.validate_input("ab", "username")  # Too short
+        assert not engine.validator.validate_input("user@name", "username")  # Invalid char
+        assert not engine.validator.validate_input("a" * 50, "username")  # Too long
 
     def test_sql_injection_detection(self):
         """Test SQL injection pattern detection"""
@@ -69,7 +68,7 @@ class TestInputValidation:
         ]
 
         for attempt in sql_injection_attempts:
-            assert not engine.validator.validate_string(attempt, max_length=100), \
+            assert not engine.validator.validate_input(attempt, "string", max_length=100), \
                 f"SQL injection attempt should be blocked: {attempt}"
 
     def test_xss_detection(self):
@@ -84,7 +83,7 @@ class TestInputValidation:
         ]
 
         for attempt in xss_attempts:
-            assert not engine.validator.validate_string(attempt, max_length=100), \
+            assert not engine.validator.validate_input(attempt, "string", max_length=100), \
                 f"XSS attempt should be blocked: {attempt}"
 
 

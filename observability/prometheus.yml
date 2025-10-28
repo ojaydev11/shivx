@@ -1,0 +1,58 @@
+# Prometheus Configuration for ShivX MLOps
+# Scrapes metrics from ML services, API, and infrastructure
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'shivx-production'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # FastAPI application metrics
+  - job_name: 'shivx-api'
+    static_configs:
+      - targets: ['api:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # MLflow tracking server
+  - job_name: 'mlflow'
+    static_configs:
+      - targets: ['mlflow:5000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Redis metrics (if redis_exporter is added)
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+
+  # PostgreSQL metrics (if postgres_exporter is added)
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # Celery worker metrics
+  - job_name: 'celery-worker'
+    static_configs:
+      - targets: ['celery-worker:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+# Recording rules for ML metrics
+rule_files:
+  - 'ml_rules.yml'

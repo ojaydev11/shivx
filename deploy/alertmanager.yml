@@ -1,0 +1,246 @@
+# ============================================================================
+# Alertmanager Configuration for ShivX
+# ============================================================================
+# Handles alert routing, grouping, and notification delivery
+# ============================================================================
+
+global:
+  # ResolveTimeout is the default value used by alertmanager if the alert does
+  # not include EndsAt. After this time, the alert can be declared resolved if
+  # it has not been updated.
+  resolve_timeout: 5m
+
+  # SMTP configuration for email alerts
+  smtp_from: 'alerts@shivx.io'
+  smtp_smarthost: '${SMTP_HOST}:${SMTP_PORT}'
+  smtp_auth_username: '${SMTP_USERNAME}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+  # Slack API URL (set via environment variable)
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+
+  # PagerDuty routing key
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+# ============================================================================
+# Templates
+# ============================================================================
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# ============================================================================
+# Route Configuration
+# ============================================================================
+# Defines how alerts are routed to different receivers based on labels
+route:
+  # Default receiver for all alerts
+  receiver: 'default'
+
+  # Group alerts by these labels
+  group_by: ['alertname', 'cluster', 'service']
+
+  # How long to wait before sending the first notification for a group
+  group_wait: 30s
+
+  # How long to wait before sending notification about new alerts added to a group
+  group_interval: 5m
+
+  # How long to wait before re-sending a given alert
+  repeat_interval: 4h
+
+  # Child routes
+  routes:
+    # ========================================================================
+    # CRITICAL alerts - Page immediately
+    # ========================================================================
+    - match:
+        severity: critical
+      receiver: 'pagerduty-critical'
+      continue: true  # Also send to other receivers
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # ========================================================================
+    # Security alerts - Page and notify on Slack
+    # ========================================================================
+    - match:
+        component: security
+      receiver: 'security-team'
+      continue: true
+      group_wait: 10s
+
+    # ========================================================================
+    # Trading alerts - Notify trading team
+    # ========================================================================
+    - match:
+        component: trading
+      receiver: 'trading-team'
+      continue: true
+
+    # ========================================================================
+    # Database alerts
+    # ========================================================================
+    - match:
+        component: database
+      receiver: 'database-team'
+      continue: true
+
+    # ========================================================================
+    # WARNING alerts - Slack only
+    # ========================================================================
+    - match:
+        severity: warning
+      receiver: 'slack-warnings'
+      repeat_interval: 12h
+
+# ============================================================================
+# Receivers Configuration
+# ============================================================================
+# Defines how to notify each team/channel
+
+receivers:
+  # ==========================================================================
+  # Default receiver - Slack general channel
+  # ==========================================================================
+  - name: 'default'
+    slack_configs:
+      - channel: '#shivx-alerts'
+        title: 'ShivX Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Component:* {{ .Labels.component }}
+          *Runbook:* {{ .Annotations.runbook }}
+          {{ end }}
+        send_resolved: true
+
+  # ==========================================================================
+  # PagerDuty for CRITICAL alerts
+  # ==========================================================================
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_INTEGRATION_KEY}'
+        severity: '{{ .CommonLabels.severity }}'
+        description: '{{ .CommonAnnotations.summary }}'
+        details:
+          alert: '{{ .CommonLabels.alertname }}'
+          component: '{{ .CommonLabels.component }}'
+          description: '{{ .CommonAnnotations.description }}'
+          runbook: '{{ .CommonAnnotations.runbook }}'
+    email_configs:
+      - to: 'oncall@shivx.io'
+        headers:
+          Subject: 'CRITICAL: {{ .CommonLabels.alertname }}'
+
+  # ==========================================================================
+  # Security team notifications
+  # ==========================================================================
+  - name: 'security-team'
+    slack_configs:
+      - channel: '#security-alerts'
+        title: 'SECURITY ALERT'
+        color: 'danger'
+        text: |
+          *SECURITY INCIDENT DETECTED*
+
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Runbook:* {{ .Annotations.runbook }}
+          *Time:* {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+          {{ end }}
+        send_resolved: true
+    email_configs:
+      - to: 'security@shivx.io'
+        headers:
+          Subject: 'SECURITY ALERT: {{ .CommonLabels.alertname }}'
+
+  # ==========================================================================
+  # Trading team notifications
+  # ==========================================================================
+  - name: 'trading-team'
+    slack_configs:
+      - channel: '#trading-alerts'
+        title: 'Trading Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Runbook:* {{ .Annotations.runbook }}
+          {{ end }}
+        send_resolved: true
+    email_configs:
+      - to: 'trading@shivx.io'
+        headers:
+          Subject: 'Trading Alert: {{ .CommonLabels.alertname }}'
+
+  # ==========================================================================
+  # Database team notifications
+  # ==========================================================================
+  - name: 'database-team'
+    slack_configs:
+      - channel: '#database-alerts'
+        title: 'Database Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Runbook:* {{ .Annotations.runbook }}
+          {{ end }}
+        send_resolved: true
+
+  # ==========================================================================
+  # Warning alerts - Less noisy
+  # ==========================================================================
+  - name: 'slack-warnings'
+    slack_configs:
+      - channel: '#shivx-warnings'
+        title: 'Warning'
+        color: 'warning'
+        text: |
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          {{ end }}
+        send_resolved: true
+
+# ============================================================================
+# Inhibition Rules
+# ============================================================================
+# Suppress certain alerts when others are firing
+inhibit_rules:
+  # Inhibit all alerts if service is down
+  - source_match:
+      alertname: 'ServiceDown'
+    target_match_re:
+      alertname: '.*'
+    equal: ['job']
+
+  # Inhibit readiness alerts if service is down
+  - source_match:
+      alertname: 'ServiceDown'
+    target_match:
+      alertname: 'ServiceNotReady'
+    equal: ['job']
+
+  # Inhibit database alerts if database is down
+  - source_match:
+      alertname: 'DatabaseConnectionFailure'
+    target_match_re:
+      component: 'database'
+    equal: ['job']
+
+  # Inhibit warning if critical alert is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'component']
+
+# ============================================================================

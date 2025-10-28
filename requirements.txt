@@ -131,6 +131,15 @@ solana==0.30.2                  # Solana Python SDK
 # anthropic==0.8.1              # Anthropic Claude API (uncomment if needed)
 
 # ----------------------------------------------------------------------------
+# MLOps & Model Management
+# ----------------------------------------------------------------------------
+mlflow==2.9.2                   # ML experiment tracking and model registry
+onnx==1.15.0                    # ONNX model format
+onnxruntime==1.16.3             # ONNX Runtime for inference
+# lime==0.2.0.1                 # Local Interpretable Model Explanations (uncomment if needed)
+# shap==0.44.0                  # SHapley Additive exPlanations (uncomment if needed)
+
+# ----------------------------------------------------------------------------
 # Development & Testing (minimal, see requirements-dev.txt for full list)
 # ----------------------------------------------------------------------------
 pytest==7.4.4                   # Testing framework
