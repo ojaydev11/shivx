@@ -1,0 +1,98 @@
+Pillar,Capability,Status,Files,Tests,Evidence,Gaps,FixPlan,ETA
+Core Autonomy & OS,Resilience Core - Health Monitoring,Present,core/resilience_core.py,tests/test_integration.py,Class ResilienceCore with continuous health monitor,Integration with main app lifecycle,Add startup integration in main.py,Week 1
+Core Autonomy & OS,Resilience Core - 5-level degradation,Present,core/resilience_core.py,tests/test_integration.py,DegradationLevel enum with NORMAL->EMERGENCY levels,None,None,Complete
+Core Autonomy & OS,Resilience Core - Auto-restart,Partial,core/resilience_core.py; observability/circuit_breaker.py,tests/test_integration.py,Circuit breaker pattern implemented; process-level restart incomplete,Process-level restart needs integration with systemd/supervisor,Add process manager integration,Week 2-3
+Core Autonomy & OS,Resilience Core - Immutable Audit Logs,Present,utils/audit_chain.py,N/A,SHA256 hash-chained audit logs with tamper detection,Test coverage needed,Add unit tests for audit chain,Week 1
+Core Autonomy & OS,Resilience Core - Watchdogs,Present,utils/continuous_watchdog.py; utils/watchdog_reporter.py,tests/test_integration.py,Continuous watchdog monitoring with reporter,None,None,Complete
+Core Autonomy & OS,Guardian/Defense - Intrusion Detection,Present,security/guardian_defense.py,tests/test_guardian_defense.py,Rate limit abuse; auth abuse; resource abuse; code tampering detection,None,None,Complete
+Core Autonomy & OS,Guardian/Defense - Sandboxing,Partial,utils/policy_guard.py; utils/path_validator.py,tests/test_security_hardening.py,Path validation and in-memory isolation; no kernel-level sandboxing,Process-level isolation (seccomp/AppArmor) missing,Implement seccomp/AppArmor policies,Week 2-4
+Core Autonomy & OS,Guardian/Defense - Permission Gates,Present,app/dependencies/auth.py,tests/test_auth_comprehensive.py,RBAC with 5 permission levels (READ/WRITE/DELETE/EXECUTE/ADMIN),None,None,Complete
+Core Autonomy & OS,Guardian/Defense - Command Allow/Deny Lists,Missing,N/A,N/A,None,No command filtering system,Implement command allowlist/denylist with policy engine,Week 3-4
+Core Autonomy & OS,Queue/Orchestrator - Task Queues,Partial,utils/executor.py,tests/test_integration.py,BoundedThreadPoolExecutor with retries,Distributed task queue missing (Celery not integrated),Integrate Celery for distributed execution,Week 2-4
+Core Autonomy & OS,Queue/Orchestrator - Retries,Present,observability/circuit_breaker.py,tests/test_integration.py,Exponential backoff retry with circuit breaker,None,None,Complete
+Core Autonomy & OS,Queue/Orchestrator - Idempotency,Partial,N/A,N/A,Not systematically enforced,No idempotency key system,Add idempotency key middleware,Week 2-3
+Core Autonomy & OS,Queue/Orchestrator - Dead-letter Handling,Missing,N/A,N/A,None,No dead-letter queue implementation,Implement DLQ pattern with replay capability,Week 3-4
+Core Autonomy & OS,Telemetry - Structured Events,Present,utils/logging_setup.py; core/deployment/production_telemetry.py,tests/test_integration.py,JSON structured logging with correlation IDs,None,None,Complete
+Core Autonomy & OS,Telemetry - Integrity (hashing),Present,utils/audit_chain.py,N/A,SHA256 hash-chained audit log,None,None,Complete
+Core Autonomy & OS,Telemetry - Privacy Filters,Partial,core/deployment/production_telemetry.py,N/A,Differential privacy available but disabled by default,No PII redaction system,Implement PII detection and redaction,Week 2-3
+Core Autonomy & OS,Telemetry - Redaction,Missing,N/A,N/A,None,No automated redaction,Implement sensitive data redaction,Week 2-3
+Core Autonomy & OS,Snapshot/Rollback - Golden Snapshots,Present,core/deployment/backup_dr.py; utils/backup.py,tests/test_integration.py,Point-in-time snapshots with multi-region backup,None,None,Complete
+Core Autonomy & OS,Snapshot/Rollback - Restore Scripts,Present,utils/restore.py; scripts/restore.sh,N/A,Automated restoration with verification,None,None,Complete
+Core Autonomy & OS,Snapshot/Rollback - Forward-redeploy Flow,Present,docs/disaster-recovery-runbook.md; .github/workflows/deploy-production.yml,N/A,Blue-green deployment with automated rollback,None,None,Complete
+Memory & Learning,Encrypted Long-term Memory,Missing,N/A,N/A,None,No persistent memory storage,Implement encrypted vector store with retention policies,Week 4-6
+Memory & Learning,Vector/RAG,Missing,N/A,N/A,None,No vector database or embeddings system,Integrate Pinecone/Weaviate/ChromaDB for semantic search,Week 4-6
+Memory & Learning,Per-project Context Stores,Partial,core/learning/empire_data_integration.py,N/A,Project data collection exists; no retrieval system,Context retrieval missing,Implement context store with TTL and pruning,Week 3-4
+Memory & Learning,Privacy-preserving/Federated Learning,Partial,core/learning/federated_learning.py,N/A,Federated learning framework exists but not integrated,Integration incomplete; no deployment,Complete federated training pipeline,Week 5-8
+Memory & Learning,Offline Training Stubs,Partial,core/learning/offline_learning.py; core/learning/continual_training.py,tests/test_ml_models.py,Continual learning exists; offline batch training incomplete,Batch training pipeline missing,Implement offline batch training with data versioning,Week 3-5
+Memory & Learning,Curriculum/Meta-learning Hooks,Present,core/learning/curriculum_learning.py; core/learning/meta_learning.py,tests/test_ml_models.py,5 curriculum strategies + MAML meta-learning,None,None,Complete
+Memory & Learning,Explanation Traces,Present,core/explain/explainer.py; core/explain/xai.py,tests/test_ml_models.py,LIME and SHAP explainability with decision logging,None,None,Complete
+Multi-Agent & Orchestration,Agent Roles (Planner/Researcher/Coder/Operator/Finance/Safety),Missing,N/A,N/A,None,No multi-agent role system,Design and implement agent role framework with task delegation,Week 4-8
+Multi-Agent & Orchestration,Intent Router,Missing,N/A,N/A,None,No intent classification or routing,Implement NLU-based intent router with fallback,Week 3-5
+Multi-Agent & Orchestration,Task Graph,Missing,N/A,N/A,None,No task composition or DAG execution,Implement DAG-based task orchestration (Airflow/Prefect),Week 4-6
+Multi-Agent & Orchestration,Interruption & Handoff,Missing,N/A,N/A,None,No agent handoff mechanism,Implement state transfer and handoff protocol,Week 5-7
+Multi-Agent & Orchestration,Parallelism Controls,Partial,utils/executor.py,tests/test_integration.py,ThreadPoolExecutor with bounded concurrency,No dynamic scaling or resource management,Add dynamic worker scaling based on load,Week 2-3
+Multi-Agent & Orchestration,Resource Governor,Missing,N/A,N/A,None,No per-agent resource limits,Implement cgroups-based resource quotas,Week 3-4
+Multi-Agent & Orchestration,Multi-Agent Debate,Present,core/reasoning/multi_agent_debate.py,N/A,3-agent debate system with consensus,Integration needed,Integrate with task execution pipeline,Week 2-3
+Tooling & Integrations,Local/Offline First,Partial,app/cache.py; app/middleware/cache.py,tests/test_cache_performance.py,Cache-first with graceful degradation; no explicit offline mode,Offline mode needs explicit configuration,Add OFFLINE_MODE env var with network isolation,Week 1-2
+Tooling & Integrations,Safe Browser Automation,Partial,N/A,N/A,Design patterns for safe automation; minimal implementation,Full implementation missing,Implement browser automation with Playwright/Selenium + sandboxing,Week 3-5
+Tooling & Integrations,GitHub Ops (read-only),Missing,N/A,N/A,None,No GitHub integration,Implement GitHub API client with read-only default + approval workflow for writes,Week 2-3
+Tooling & Integrations,Gmail/Calendar,Missing,N/A,N/A,Only SMTP email exists,No Gmail/Calendar integration,Implement Google APIs with OAuth2 + read-only mode,Week 3-4
+Tooling & Integrations,Telegram Bot Bridge,Missing,N/A,N/A,Slack webhook exists as alternative,No Telegram integration,Implement Telegram bot with python-telegram-bot,Week 2-3
+Tooling & Integrations,Claude/ChatGPT Bridges,Partial,config/settings.py (.env.example has API keys),N/A,API keys configured; no actual API calls,No LLM API clients,Implement LLM clients with rate limiting + sandboxing,Week 2-4
+Tooling & Integrations,Birdeye/Jupiter,Present,core/income/jupiter_client.py,tests/test_trading_api.py,Full Jupiter DEX integration with 468 lines,None,None,Complete
+Tooling & Integrations,Pump.fun WebSocket,Missing,N/A,N/A,None,No Pump.fun integration,Implement WebSocket client with reconnection logic,Week 2-3
+Tooling & Integrations,No Secrets Hardcoded,Present,.env.example; .env.production.example,tests/test_security_hardening.py,All secrets use placeholders; no hardcoded values,None,None,Complete
+Tooling & Integrations,Key Vault Pattern,Present,utils/secrets_vault.py,tests/test_security_hardening.py,Professional vault with DPAPI + Fernet encryption,None,None,Complete
+Tooling & Integrations,.env.example Complete,Present,.env.example (310 lines); .env.production.example (366 lines),N/A,Comprehensive with 40+ variables and comments,None,None,Complete
+UI/Voice/UX,GUI Dashboard,Partial,observability/grafana/dashboards/*.json (5 dashboards),N/A,Grafana dashboards for metrics; no web UI,No React/Vue web dashboard,Build React dashboard with real-time WebSocket updates,Week 4-8
+UI/Voice/UX,Voice I/O (Whisper/Vosk/Coqui),Missing,N/A,tests/test_integration.py (stub only),Only stub test; no implementation,No STT/TTS implementation,Integrate Whisper (STT) + pyttsx3 (TTS),Week 3-5
+UI/Voice/UX,Soul Mode,Missing,N/A,N/A,None,No affective or emotional response system,Design and implement affective computing module,Week 6-10
+UI/Voice/UX,Hotkeys,Missing,N/A,N/A,Click/Rich frameworks installed but unused,No keyboard shortcuts or TUI,Implement keyboard shortcuts with pynput or TUI with textual,Week 2-3
+UI/Voice/UX,Accessibility,Missing,N/A,N/A,None,No WCAG 2.1 compliance,Implement accessibility (ARIA labels; keyboard navigation; screen reader support),Week 4-6
+Security & Policy,Prompt Injection Mitigations,Missing,N/A,N/A,None,CRITICAL: No prompt injection detection,Implement input/output filtering with keyword detection + sanitization,Week 1-2
+Security & Policy,Model-spec Safety Hooks,Missing,N/A,N/A,None,No LLM safety constraints,Implement safety classifier + output validation,Week 2-3
+Security & Policy,Content Moderation (18+),Missing,N/A,N/A,None,No content filtering,Integrate content moderation API (OpenAI Moderation or Perspective),Week 1-2
+Security & Policy,DLP,Missing,N/A,N/A,None,CRITICAL: No data loss prevention,Implement PII detection + secret scanning in outputs,Week 1-2
+Security & Policy,RBAC,Present,app/dependencies/auth.py,tests/test_auth_comprehensive.py,5 permission levels with decorator-based enforcement,None,None,Complete
+Security & Policy,Capability Tokens,Missing,N/A,N/A,None,No fine-grained capability delegation,Implement capability-based token system,Week 3-4
+Security & Policy,Network Egress Deny-by-default,Partial,utils/policy_guard.py,N/A,Domain blocking exists; no IP/DNS filtering,IP-level egress control missing,Implement iptables/nftables rules or egress proxy,Week 2-3
+Security & Policy,Allowlist of Domains,Partial,utils/policy_guard.py,tests/test_security_hardening.py,Domain blocking implemented; no explicit allowlist,Convert to allowlist model,Refactor to allowlist-only with deny-all default,Week 1-2
+Security & Policy,Strict File System Scopes,Partial,utils/path_validator.py,tests/test_security_hardening.py,Path validation with directory restrictions,No chroot or container-level isolation,Implement chroot or container mount restrictions,Week 2-3
+DevEx & CI/CD,Setup Scripts (make/scripts),Present,scripts/dev_bootstrap.sh; scripts/dev_bootstrap.ps1,N/A,Bootstrap scripts for Windows and Unix,None,None,Complete
+DevEx & CI/CD,Deterministic Environment,Present,requirements.txt; requirements-dev.txt; pyproject.toml,N/A,All deps pinned exactly; supports Python 3.10-3.12,None,None,Complete
+DevEx & CI/CD,CI: Lint,Partial,.github/workflows/deploy-production.yml,N/A,Security scan exists; no lint job,No black/flake8/mypy in CI,Add lint job with black + flake8 + mypy,Week 1
+DevEx & CI/CD,CI: Typecheck,Missing,.github/workflows/deploy-production.yml,N/A,None,No mypy typecheck in CI,Add mypy to CI pipeline,Week 1
+DevEx & CI/CD,CI: Unit Tests,Partial,.github/workflows/deploy-production.yml,570+ tests across 16 files,Tests exist; not in PR validation workflow,No PR gate with test requirements,Add PR validation workflow with test gate,Week 1
+DevEx & CI/CD,CI: E2E Tests,Partial,tests/test_e2e_workflows.py,N/A,E2E tests exist; not in CI,No E2E in CI pipeline,Add E2E test job to CI,Week 1-2
+DevEx & CI/CD,CI: Security Scan,Present,.github/workflows/deploy-production.yml (Trivy),N/A,Trivy security scanning integrated,None,None,Complete
+DevEx & CI/CD,CI: SBOM,Present,release/artifacts/sbom.json (CycloneDX),N/A,SBOM generation implemented,None,None,Complete
+DevEx & CI/CD,CI: Release,Partial,.github/workflows/deploy-production.yml,N/A,Production deployment workflow exists; no release automation,No semantic-release or changelog generation,Add semantic-release for versioning + changelog,Week 1-2
+DevEx & CI/CD,Packaging: Windows .exe,Missing,N/A,N/A,None,No PyInstaller configuration,Create PyInstaller spec + code signing workflow,Week 2-4
+DevEx & CI/CD,Signed Artifacts,Missing,N/A,N/A,None,No artifact signing,Implement Docker image signing + Python package signing,Week 2-3
+DevEx & CI/CD,Reproducible Builds,Missing,N/A,N/A,None,No build reproducibility documentation,Document reproducible build process + hash verification,Week 2-3
+Observability & Ops,Health Endpoints,Present,app/routes/health.py; app/services/readiness.py,tests/test_integration.py,Liveness + readiness + component checks,None,None,Complete
+Observability & Ops,SLOs/SLIs,Partial,docs/disaster-recovery-runbook.md (RTO/RPO defined),N/A,RTO <1hr; RPO <15min; no formal SLO framework,No SLO tracking or error budgets,Create formal SLO document with error budget tracking,Week 2-3
+Observability & Ops,Anomaly Detection,Partial,core/deployment/monitoring.py,N/A,Data drift + threshold alerts; no statistical ML,No ML-based anomaly detection,Implement statistical anomaly detection (Z-score/IQR/Prophet),Week 3-5
+Observability & Ops,Crash Reports,Present,utils/logging_setup.py; observability/tracing.py,N/A,Exception logging + distributed tracing,None,None,Complete
+Observability & Ops,Runbooks,Present,release/runbooks/troubleshooting.md; docs/disaster-recovery-runbook.md,N/A,Troubleshooting + DR runbooks (1320 lines total),None,None,Complete
+Observability & Ops,On-call Quick Cards,Partial,deploy/alertmanager.yml (routing configured),N/A,Alert routing exists; no quick reference cards,Quick reference cards missing,Create on-call quick cards for common incidents,Week 1-2
+Observability & Ops,Chaos/Failure-Injection Scripts,Present,scripts/chaos_test_real.py,N/A,4 chaos scenarios with recovery validation,None,None,Complete
+Project Bridges,Control Shims (SewaGo/HaloBuzz/SolSnipePro),Partial,core/learning/empire_data_integration.py; core/reasoning/empire_causal_models.py,N/A,Data integration + causal models; no control API,No enable/disable per project,Add project control endpoints (/api/empire/{project}/enable|disable),Week 2-3
+Project Bridges,Reporting Layer,Partial,app/routes/health.py,N/A,Basic health checks; no cross-project visibility,No unified reporting dashboard,Add empire status endpoints + cross-project metrics,Week 2-3
+Project Bridges,Read-only vs Write Access,Present,app/dependencies/auth.py,tests/test_auth_comprehensive.py,RBAC properly separates permissions,None,None,Complete
+Project Bridges,No Hidden Cross-app Coupling,Partial,core/learning/multitask_rl_training.py,N/A,Shared RL encoder creates coupling,Tight coupling in training,Isolate RL policies per project,Week 4-6
+Project Bridges,MyGPT Master Control Switch,Missing,N/A,N/A,None,No unified control interface,Design and implement master control API,Week 3-5
+Privacy & Offline,Full Offline Mode,Partial,app/cache.py,tests/test_cache_performance.py,Graceful degradation; no explicit offline mode,No OFFLINE_MODE configuration,Add OFFLINE_MODE env var with network isolation verification,Week 1-2
+Privacy & Offline,Explicit Consent for Network Usage,Missing,N/A,N/A,None,No consent tracking,Implement consent API with user preferences,Week 2-3
+Privacy & Offline,Telemetry Privacy Modes,Missing,core/deployment/production_telemetry.py,N/A,Telemetry always active; no opt-out,No privacy controls for telemetry,Add telemetry opt-out + privacy levels (minimal/standard/full),Week 1-2
+Privacy & Offline,Data Retention & Purge Commands,Partial,utils/retention.py; utils/artifacts.py,N/A,Artifact cleanup works; telemetry persists forever,No telemetry purge,Implement telemetry retention policies with purge commands,Week 2-3
+Privacy & Offline,Air-gapped Mode Guarantees,Missing,N/A,N/A,None,No network isolation guarantee,Implement air-gapped mode with network disable verification,Week 2-4
+Distribution & Docs,Architecture Maps,Present,README.md; EMPIRE_IMPLEMENTATION_DETAILS.md,N/A,ASCII diagrams + component breakdown,No formal diagrams (e.g. mermaid),Add formal architecture diagrams,Week 1-2
+Distribution & Docs,Threat Model,Partial,SECURITY.md; docs/security-checklist.md,N/A,Security layers documented; no formal threat scenarios,No STRIDE or attack tree analysis,Create formal threat model with STRIDE methodology,Week 2-3
+Distribution & Docs,Safety Policy,Present,SECURITY.md; SECURITY_HARDENING_REPORT.md,N/A,Multi-layer security policy documented,None,None,Complete
+Distribution & Docs,Ops Runbooks,Present,release/runbooks/troubleshooting.md; docs/disaster-recovery-runbook.md; PRODUCTION_DEPLOYMENT_GUIDE.md,N/A,1320+ lines of runbooks,Missing incident response runbook,Add incident response and escalation procedures,Week 1-2
+Distribution & Docs,Rollback Proof,Present,PRODUCTION_DEPLOYMENT_GUIDE.md; docs/disaster-recovery-runbook.md,N/A,3 rollback strategies documented,None,None,Complete
+Distribution & Docs,Acceptance Criteria,Present,release/artifacts/production_readiness_certificate.md; release/STATUS.md,N/A,8 gates with measurable criteria,None,None,Complete
+Distribution & Docs,E2E Demo Scripts,Partial,examples/cache_integration_example.py,N/A,1 example file; limited coverage,Missing trading/agent/security demos,Create comprehensive demo scripts for key workflows,Week 2-3
+Distribution & Docs,Windows .exe Build Pipeline,Missing,N/A,N/A,None,No PyInstaller or packaging,Create PyInstaller spec + CI job for Windows builds,Week 2-4
+Distribution & Docs,CHANGELOG,Missing,N/A,N/A,None,No version history,Create CHANGELOG.md and automate with semantic-release,Week 1
