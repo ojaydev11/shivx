@@ -24,8 +24,18 @@ request_start_time: ContextVar[Optional[float]] = ContextVar('request_start_time
 
 
 class JSONFormatter(logging.Formatter):
-    """Custom JSON formatter that includes trace context."""
-    
+    """Custom JSON formatter that includes trace context and DLP filtering."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Import DLP filter for log redaction
+        try:
+            from utils.dlp import get_dlp_filter
+            self.dlp = get_dlp_filter(enable_logging=False)  # Don't log within logging
+            self.dlp_enabled = True
+        except Exception:
+            self.dlp_enabled = False
+
     def format(self, record: logging.LogRecord) -> str:
         # Get trace context from contextvars
         trace_context = {
@@ -39,25 +49,44 @@ class JSONFormatter(logging.Formatter):
             'method': request_method.get(),
             'status': request_status.get(),
         }
-        
+
         # Add duration if we have start time
         if request_start_time.get():
             duration_ms = int((time.time() - request_start_time.get()) * 1000)
             trace_context['dur_ms'] = duration_ms
-        
+
         # Add exception info if present
         if record.exc_info:
             trace_context['exception'] = self.formatException(record.exc_info)
-        
+
         # Add extra fields from record
         for key, value in record.__dict__.items():
-            if key not in ['name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 
+            if key not in ['name', 'msg', 'args', 'levelname', 'levelno', 'pathname',
                           'filename', 'module', 'lineno', 'funcName', 'created', 'msecs',
                           'relativeCreated', 'thread', 'threadName', 'processName', 'process',
                           'getMessage', 'exc_info', 'exc_text', 'stack_info']:
                 trace_context[key] = value
-        
-        return json.dumps(trace_context, ensure_ascii=False)
+
+        # SECURITY: Redact sensitive data from logs using DLP
+        log_output = json.dumps(trace_context, ensure_ascii=False)
+
+        if self.dlp_enabled:
+            try:
+                # Scan and redact sensitive data
+                scan_result = self.dlp.scan(log_output)
+                if scan_result.found_sensitive_data:
+                    # Use redacted version
+                    log_output = scan_result.redacted_text
+                    # Add warning that log was redacted
+                    redacted_log = json.loads(log_output)
+                    redacted_log['_dlp_redacted'] = True
+                    redacted_log['_redaction_count'] = scan_result.redacted_count
+                    log_output = json.dumps(redacted_log, ensure_ascii=False)
+            except Exception:
+                # If DLP fails, still log (but without redaction)
+                pass
+
+        return log_output
 
 
 def init_logging(config: Dict[str, Any]) -> None:

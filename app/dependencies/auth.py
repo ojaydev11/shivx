@@ -224,6 +224,91 @@ async def get_api_key(
     if x_api_key is None:
         return None
 
-    # TODO: Validate API key against database
-    # For now, just return it
-    return x_api_key
+    # Import here to avoid circular dependency
+    from app.database import get_db
+    from app.models.user import APIKey
+    from sqlalchemy import select
+    import hashlib
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Validate API key against database
+    validated_key = await validate_api_key_against_db(x_api_key, settings)
+    if validated_key is None:
+        logger.warning(f"Invalid API key attempted: {x_api_key[:8]}...")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+    return validated_key
+
+
+async def validate_api_key_against_db(api_key: str, settings: Settings) -> Optional[str]:
+    """
+    Validate API key against database
+
+    Args:
+        api_key: API key to validate
+        settings: Application settings
+
+    Returns:
+        API key if valid, None otherwise
+    """
+    import hashlib
+    from datetime import datetime, timezone
+    from app.database import get_db
+    from app.models.user import APIKey, User
+    from sqlalchemy import select
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Hash the API key
+        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+
+        # Query database for matching key
+        async for db in get_db():
+            result = await db.execute(
+                select(APIKey, User)
+                .join(User, APIKey.user_id == User.user_id)
+                .where(APIKey.key_hash == key_hash)
+            )
+            row = result.first()
+
+            if row is None:
+                logger.warning(f"API key not found in database: {api_key[:8]}...")
+                return None
+
+            api_key_obj, user = row
+
+            # Check if key is active
+            if not api_key_obj.is_active:
+                logger.warning(f"API key is inactive: {api_key_obj.key_id}")
+                return None
+
+            # Check if key is expired
+            if api_key_obj.expires_at and datetime.now(timezone.utc) > api_key_obj.expires_at:
+                logger.warning(f"API key is expired: {api_key_obj.key_id}")
+                return None
+
+            # Check if user is active
+            if not user.is_active:
+                logger.warning(f"User is inactive for API key: {user.user_id}")
+                return None
+
+            # Update last_used_at
+            api_key_obj.last_used_at = datetime.now(timezone.utc)
+            await db.commit()
+
+            logger.info(f"API key validated successfully: {api_key_obj.key_id}")
+            return api_key
+
+    except Exception as e:
+        logger.error(f"Error validating API key: {e}")
+        return None
+
+    return None

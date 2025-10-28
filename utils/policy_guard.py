@@ -236,9 +236,14 @@ class PolicyGuard:
         )
     
     def _evaluate_network_request(self, payload: Dict[str, Any]) -> PolicyDecision:
-        """Evaluate network requests"""
+        """
+        Evaluate network requests using ALLOWLIST model
+
+        CRITICAL SECURITY: Network egress is blocked by default.
+        Only explicitly allowed domains can be accessed.
+        """
         url = payload.get("url", "")
-        
+
         try:
             parsed = urlparse(url)
             domain = parsed.netloc
@@ -250,42 +255,67 @@ class PolicyGuard:
                 requires_approval=False,
                 metadata={"url": url}
             )
-        
-        # Check browser policy
-        browser_rules = self.merged_rules.get("browser", {})
-        allowed_domains = browser_rules.get("allow", [])
-        blocked_domains = browser_rules.get("block", [])
-        
-        # Check blocked domains
-        for blocked in blocked_domains:
-            if self._domain_matches(domain, blocked):
-                return PolicyDecision(
-                    decision="deny",
-                    reasons=[f"Domain '{domain}' is blocked by policy"],
-                    risk_score=90,
-                    requires_approval=False,
-                    metadata={"url": url, "domain": domain}
-                )
-        
-        # Check allowed domains
-        for allowed in allowed_domains:
-            if self._domain_matches(domain, allowed):
-                return PolicyDecision(
-                    decision="allow",
-                    reasons=[f"Domain '{domain}' is explicitly allowed"],
-                    risk_score=15,
-                    requires_approval=False,
-                    metadata={"url": url, "domain": domain}
-                )
-        
-        # Default: warn for unknown domains
-        return PolicyDecision(
-            decision="warn",
-            reasons=[f"Domain '{domain}' not in allowlist - proceed with caution"],
-            risk_score=60,
-            requires_approval=True,
-            metadata={"url": url, "domain": domain}
-        )
+
+        # ALLOWLIST MODEL: Define allowed domains for network egress
+        ALLOWED_DOMAINS = [
+            # Solana RPC
+            "api.mainnet-beta.solana.com",
+            "api.devnet.solana.com",
+            "api.testnet.solana.com",
+            "solana.com",
+
+            # Jupiter DEX Aggregator
+            "quote-api.jup.ag",
+            "api.jup.ag",
+            "jupiter-swap-api.quiknode.pro",
+
+            # AI/ML APIs
+            "api.openai.com",
+            "api.anthropic.com",
+            "api.cohere.ai",
+
+            # Monitoring and observability
+            "*.sentry.io",
+            "api.datadoghq.com",
+
+            # Package repositories (for updates only)
+            "pypi.org",
+            "files.pythonhosted.org",
+        ]
+
+        # Check if domain is in allowlist
+        domain_allowed = False
+        matched_pattern = None
+
+        for allowed_pattern in ALLOWED_DOMAINS:
+            if self._domain_matches(domain, allowed_pattern):
+                domain_allowed = True
+                matched_pattern = allowed_pattern
+                break
+
+        if domain_allowed:
+            logger.info(f"Network request ALLOWED: {domain} (matched: {matched_pattern})")
+            return PolicyDecision(
+                decision="allow",
+                reasons=[f"Domain '{domain}' is in allowlist (matched: {matched_pattern})"],
+                risk_score=15,
+                requires_approval=False,
+                metadata={"url": url, "domain": domain, "matched_pattern": matched_pattern}
+            )
+        else:
+            # DENY by default - not in allowlist
+            logger.warning(f"Network request BLOCKED: {domain} (not in allowlist)")
+            return PolicyDecision(
+                decision="deny",
+                reasons=[
+                    f"Domain '{domain}' is NOT in allowlist",
+                    "Network egress is blocked by default for security",
+                    "Add domain to ALLOWED_DOMAINS in policy_guard.py if needed"
+                ],
+                risk_score=95,
+                requires_approval=False,
+                metadata={"url": url, "domain": domain, "allowlist": ALLOWED_DOMAINS}
+            )
     
     def _evaluate_browser_automation(self, payload: Dict[str, Any]) -> PolicyDecision:
         """Evaluate browser automation actions"""

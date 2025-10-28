@@ -1,6 +1,11 @@
 """
 Retention management for ShivX run artifacts.
 Handles cleanup of old runs based on age and size limits.
+
+Enhanced with GDPR integration:
+- User-specific retention policies
+- Auto-purge of expired data
+- Compliance with data retention requirements
 """
 
 import json
@@ -10,6 +15,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 import logging
+
+from config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -193,23 +200,83 @@ class ArtifactRetention:
     def prune_artifacts(self) -> Dict[str, int]:
         """Prune old artifacts and return cleanup summary"""
         runs_to_cleanup = self.get_runs_to_cleanup()
-        
+
         total_bytes_freed = 0
         runs_cleaned = 0
-        
+
         for run_entry in runs_to_cleanup:
             run_id = run_entry["run_id"]
             bytes_freed = self.cleanup_run(run_id)
             total_bytes_freed += bytes_freed
             runs_cleaned += 1
-        
+
         result = {
             "runs_cleaned": runs_cleaned,
             "bytes_freed": total_bytes_freed,
             "runs_remaining": len(self.get_runs_to_cleanup())
         }
-        
+
         logger.info(f"Pruned {runs_cleaned} runs, freed {total_bytes_freed} bytes")
+        return result
+
+    async def purge_user_data(self, user_id: str) -> Dict[str, int]:
+        """
+        Purge all data for a specific user (GDPR integration)
+
+        Args:
+            user_id: User identifier
+
+        Returns:
+            Dictionary with purge statistics
+        """
+        logger.info(f"Purging all data for user: {user_id}")
+
+        total_bytes_freed = 0
+        files_deleted = 0
+
+        # Purge user-specific runs
+        if self.index_file.exists():
+            try:
+                with open(self.index_file, 'r') as f:
+                    index_data = json.load(f)
+
+                user_runs = [
+                    entry for entry in index_data
+                    if entry.get("user_id") == user_id
+                ]
+
+                for run_entry in user_runs:
+                    run_id = run_entry["run_id"]
+                    bytes_freed = self.cleanup_run(run_id)
+                    total_bytes_freed += bytes_freed
+                    files_deleted += 1
+
+            except Exception as e:
+                logger.error(f"Error purging user runs: {e}")
+
+        # Purge user directory
+        user_dir = Path(f"./data/users/{user_id}")
+        if user_dir.exists():
+            try:
+                dir_size = self._get_dir_size(user_dir)
+                shutil.rmtree(user_dir)
+                total_bytes_freed += dir_size
+                files_deleted += 1
+                logger.info(f"Deleted user directory: {user_dir}")
+            except Exception as e:
+                logger.error(f"Error deleting user directory: {e}")
+
+        result = {
+            "user_id": user_id,
+            "files_deleted": files_deleted,
+            "bytes_freed": total_bytes_freed,
+        }
+
+        logger.info(
+            f"User data purged: user={user_id}, "
+            f"files={files_deleted}, bytes={total_bytes_freed}"
+        )
+
         return result
     
     def get_retention_stats(self) -> Dict:

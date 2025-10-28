@@ -127,8 +127,18 @@ solana==0.30.2                  # Solana Python SDK
 # ----------------------------------------------------------------------------
 # External API Clients
 # ----------------------------------------------------------------------------
-# openai==1.7.2                 # OpenAI API client (uncomment if needed)
-# anthropic==0.8.1              # Anthropic Claude API (uncomment if needed)
+openai==1.7.2                   # OpenAI API client (for LLM integration)
+anthropic==0.18.1               # Anthropic Claude API (for LLM integration)
+
+# ----------------------------------------------------------------------------
+# Integration Dependencies
+# ----------------------------------------------------------------------------
+PyGithub==2.1.1                 # GitHub API integration
+google-api-python-client==2.111.0  # Google APIs (Gmail, Calendar)
+google-auth-httplib2==0.2.0     # Google Auth HTTP
+google-auth-oauthlib==1.2.0     # Google OAuth2
+python-telegram-bot==20.7       # Telegram bot integration
+playwright==1.40.0              # Browser automation
 
 # ----------------------------------------------------------------------------
 # MLOps & Model Management

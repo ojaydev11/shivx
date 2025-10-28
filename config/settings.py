@@ -448,6 +448,83 @@ class Settings(BaseSettings):
     )
 
     # ========================================================================
+    # Privacy and Compliance Configuration
+    # ========================================================================
+
+    offline_mode: bool = Field(
+        default=False,
+        description=(
+            "Offline mode - blocks all outbound HTTP requests (except localhost). "
+            "Uses cached data only. Disables telemetry. Enables true air-gapped operation."
+        )
+    )
+
+    airgap_mode: bool = Field(
+        default=False,
+        description=(
+            "Air-gap mode - maximum network isolation. "
+            "Fails startup if network interfaces detected. "
+            "Even more restrictive than offline_mode."
+        )
+    )
+
+    telemetry_mode: str = Field(
+        default="standard",
+        description=(
+            "Telemetry collection mode: "
+            "disabled (no telemetry), "
+            "minimal (errors + critical events only), "
+            "standard (errors + performance), "
+            "full (all events - dev only)"
+        )
+    )
+
+    respect_dnt: bool = Field(
+        default=True,
+        description="Respect Do Not Track (DNT) header in HTTP requests"
+    )
+
+    gdpr_mode: bool = Field(
+        default=True,
+        description="Enable GDPR compliance features (data export, forget-me, etc.)"
+    )
+
+    data_retention_days: int = Field(
+        default=90,
+        ge=1,
+        description="Default data retention period (days) for user data"
+    )
+
+    conversation_retention_days: int = Field(
+        default=90,
+        ge=1,
+        description="Conversation history retention (days)"
+    )
+
+    memory_retention_days: int = Field(
+        default=365,
+        ge=1,
+        description="Memory entries retention (days)"
+    )
+
+    audit_log_retention_days: int = Field(
+        default=90,
+        ge=1,
+        description="Audit log retention (days)"
+    )
+
+    telemetry_retention_days: int = Field(
+        default=30,
+        ge=1,
+        description="Telemetry data retention (days)"
+    )
+
+    auto_purge_enabled: bool = Field(
+        default=True,
+        description="Enable automatic purging of expired data"
+    )
+
+    # ========================================================================
     # Feature Flags
     # ========================================================================
 

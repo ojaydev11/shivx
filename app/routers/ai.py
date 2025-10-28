@@ -13,6 +13,11 @@ from app.dependencies import get_current_user, require_permission, get_settings
 from app.dependencies.auth import TokenData
 from config.settings import Settings
 from core.security.hardening import Permission
+from utils.prompt_filter import get_prompt_filter, ThreatLevel
+from utils.content_moderation import get_content_moderator, ModerationSeverity
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(
@@ -180,7 +185,29 @@ async def predict(
 
     Args:
         request: Prediction request with model ID and features
+
+    Security:
+        - Validates input for prompt injection attempts
+        - Scans output for leaked secrets
+        - Content moderation for harmful content
     """
+    # SECURITY: Validate model_id for prompt injection
+    prompt_filter = get_prompt_filter(strict_mode=True)
+    input_validation = prompt_filter.filter_input(request.model_id)
+
+    if not input_validation.is_safe:
+        logger.warning(
+            f"Prompt injection detected in model_id: {input_validation.detected_threats}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "Invalid input detected",
+                "threat_level": input_validation.threat_level.value,
+                "threats": input_validation.detected_threats
+            }
+        )
+
     # TODO: Load model and make prediction
     # from core.learning.model_registry import ModelRegistry
     # registry = ModelRegistry()
@@ -208,6 +235,21 @@ async def predict(
             ],
             "decision_boundary": "Confidence threshold: 0.70"
         }
+
+    # SECURITY: Validate output for leaked secrets
+    # Note: This is a basic check. The DLP middleware will do a more thorough scan
+    import json
+    output_str = json.dumps(response.dict())
+    output_validation = prompt_filter.filter_output(output_str)
+
+    if not output_validation.is_safe:
+        logger.critical(
+            f"Secret leak detected in prediction output: {output_validation.detected_threats}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Output validation failed - potential security issue"
+        )
 
     return response
 

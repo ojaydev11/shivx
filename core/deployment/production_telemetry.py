@@ -14,6 +14,12 @@ This data is critical for:
 - Real-world benchmarking
 - Identifying edge cases
 - User experience optimization
+
+Privacy Controls:
+- Respects user consent for analytics
+- Respects Do Not Track (DNT) headers
+- Respects telemetry mode (disabled/minimal/standard/full)
+- Disabled in offline mode and air-gap mode
 """
 
 import logging
@@ -24,6 +30,8 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from enum import Enum
+
+from config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -91,11 +99,72 @@ class ProductionTelemetry:
         """
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.settings = get_settings()
+        self._enabled = self._check_telemetry_enabled()
 
-        # Initialize database
-        self._init_database()
+        # Initialize database only if telemetry enabled
+        if self._enabled:
+            self._init_database()
+            logger.info(f"Production Telemetry initialized: {db_path}")
+        else:
+            logger.info("Production Telemetry disabled due to privacy settings")
 
-        logger.info(f"Production Telemetry initialized: {db_path}")
+    def _check_telemetry_enabled(self) -> bool:
+        """
+        Check if telemetry collection is enabled
+
+        Returns:
+            True if telemetry allowed, False otherwise
+        """
+        # Check offline mode
+        if self.settings.offline_mode:
+            logger.debug("Telemetry disabled: offline mode")
+            return False
+
+        # Check air-gap mode
+        if self.settings.airgap_mode:
+            logger.debug("Telemetry disabled: air-gap mode")
+            return False
+
+        # Check telemetry mode
+        if self.settings.telemetry_mode == "disabled":
+            logger.debug("Telemetry disabled: telemetry_mode=disabled")
+            return False
+
+        return True
+
+    def is_enabled(self) -> bool:
+        """Check if telemetry is enabled"""
+        return self._enabled
+
+    def should_collect_event(self, event_type: str) -> bool:
+        """
+        Check if event type should be collected based on telemetry mode
+
+        Args:
+            event_type: Type of event (error, performance, usage)
+
+        Returns:
+            True if event should be collected
+        """
+        if not self._enabled:
+            return False
+
+        mode = self.settings.telemetry_mode
+
+        if mode == "disabled":
+            return False
+        elif mode == "minimal":
+            # Only errors and critical events
+            return event_type in ("error", "critical", "failure")
+        elif mode == "standard":
+            # Errors + performance
+            return event_type in ("error", "critical", "failure", "performance", "latency")
+        elif mode == "full":
+            # All events (dev only)
+            return True
+
+        return False
 
     def _init_database(self):
         """Initialize SQLite database for telemetry"""
@@ -169,6 +238,17 @@ class ProductionTelemetry:
         Args:
             task: Task to log
         """
+        # Check if telemetry enabled
+        if not self._enabled:
+            logger.debug("Telemetry disabled - skipping task log")
+            return
+
+        # Check if event type should be collected
+        event_type = "error" if task.outcome == TaskOutcome.ERROR else "usage"
+        if not self.should_collect_event(event_type):
+            logger.debug(f"Telemetry mode {self.settings.telemetry_mode} - skipping {event_type} event")
+            return
+
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
                 INSERT INTO tasks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -204,6 +284,15 @@ class ProductionTelemetry:
             feedback: User feedback
             comment: Optional comment
         """
+        # Check if telemetry enabled
+        if not self._enabled:
+            logger.debug("Telemetry disabled - skipping feedback log")
+            return
+
+        if not self.should_collect_event("usage"):
+            logger.debug(f"Telemetry mode {self.settings.telemetry_mode} - skipping feedback event")
+            return
+
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("""
                 UPDATE tasks

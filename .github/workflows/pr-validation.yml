@@ -1,0 +1,455 @@
+# ShivX AGI - Pull Request Validation Workflow
+# Runs comprehensive checks on all pull requests to main/master
+# All checks must pass before PR can be merged
+
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+    types: [opened, synchronize, reopened]
+
+# Prevent multiple concurrent runs for the same PR
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.10'
+  COVERAGE_THRESHOLD: 75
+
+jobs:
+  # ============================================================================
+  # Job 1: Code Linting
+  # ============================================================================
+  lint:
+    name: Code Linting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install linting dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install black==23.12.1 flake8==7.0.0 isort==5.13.2
+
+      - name: Run Black (format check)
+        run: |
+          black --check app core utils tests
+          echo "✓ Black format check passed"
+
+      - name: Run isort (import order check)
+        run: |
+          isort --check-only app core utils tests
+          echo "✓ isort import order check passed"
+
+      - name: Run Flake8 (style check)
+        run: |
+          flake8 app core utils tests --max-line-length=100 --extend-ignore=E203,W503
+          echo "✓ Flake8 style check passed"
+
+      - name: Comment lint results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const message = status === 'success'
+              ? '✅ **Linting Passed** - Code formatting and style checks are clean!'
+              : '❌ **Linting Failed** - Please fix formatting issues:\n\n```\nRun: black app core utils tests\nRun: isort app core utils tests\n```';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+
+  # ============================================================================
+  # Job 2: Type Checking
+  # ============================================================================
+  typecheck:
+    name: Type Checking
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install mypy==1.8.0 types-requests types-redis types-PyYAML
+          pip install -r requirements.txt
+
+      - name: Run mypy (type checking)
+        run: |
+          mypy app core utils --ignore-missing-imports --no-strict-optional
+          echo "✓ Type checking passed"
+
+      - name: Comment type check results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const message = status === 'success'
+              ? '✅ **Type Checking Passed** - Type annotations are correct!'
+              : '❌ **Type Checking Failed** - Please fix type errors.';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+
+  # ============================================================================
+  # Job 3: Test Suite with Coverage
+  # ============================================================================
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: shivx
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: shivx_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Create .env for testing
+        run: |
+          cp .env.example .env
+          sed -i 's/DATABASE_URL=.*/DATABASE_URL=postgresql:\/\/shivx:testpassword@localhost:5432\/shivx_test/' .env
+          sed -i 's/REDIS_URL=.*/REDIS_URL=redis:\/\/localhost:6379/' .env
+
+      - name: Run database migrations
+        run: |
+          alembic upgrade head
+
+      - name: Run tests with coverage
+        run: |
+          pytest \
+            -v \
+            --cov=app \
+            --cov=core \
+            --cov=utils \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-report=html \
+            --junitxml=pytest-results.xml
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(python -c "import xml.etree.ElementTree as ET; tree = ET.parse('coverage.xml'); root = tree.getroot(); print(float(root.attrib['line-rate']) * 100)")
+          echo "Coverage: $COVERAGE%"
+
+          if (( $(echo "$COVERAGE < $COVERAGE_THRESHOLD" | bc -l) )); then
+            echo "❌ Coverage $COVERAGE% is below threshold $COVERAGE_THRESHOLD%"
+            exit 1
+          else
+            echo "✅ Coverage $COVERAGE% meets threshold $COVERAGE_THRESHOLD%"
+          fi
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: htmlcov/
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: pytest-results.xml
+
+      - name: Comment test results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const status = '${{ job.status }}';
+
+            let coverageData = '';
+            try {
+              const xml = fs.readFileSync('coverage.xml', 'utf8');
+              const match = xml.match(/line-rate="([0-9.]+)"/);
+              if (match) {
+                const coverage = (parseFloat(match[1]) * 100).toFixed(2);
+                coverageData = `\n**Coverage:** ${coverage}%`;
+              }
+            } catch (error) {
+              console.error('Error reading coverage:', error);
+            }
+
+            const message = status === 'success'
+              ? `✅ **Tests Passed** - All tests are passing!${coverageData}`
+              : `❌ **Tests Failed** - Some tests are failing. Please review the test results.${coverageData}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+
+  # ============================================================================
+  # Job 4: Security Scanning
+  # ============================================================================
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      security-events: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit==1.7.6 safety==3.0.1
+
+      - name: Run Bandit (code security scan)
+        run: |
+          bandit -r app core utils -f json -o bandit-report.json || true
+          bandit -r app core utils -f screen
+
+      - name: Run Safety (dependency vulnerability scan)
+        run: |
+          pip install -r requirements.txt
+          safety check --json > safety-report.json || true
+          safety check || true
+
+      - name: Run Trivy (filesystem vulnerability scan)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+            trivy-results.sarif
+
+      - name: Check for critical vulnerabilities
+        run: |
+          echo "Checking for critical security issues..."
+
+          # Check bandit results
+          if [ -f bandit-report.json ]; then
+            CRITICAL_COUNT=$(jq '.metrics._totals.SEVERITY | .[] | select(.level == "HIGH" or .level == "MEDIUM") | .count' bandit-report.json | awk '{s+=$1} END {print s}' || echo 0)
+            echo "Bandit high/medium issues: $CRITICAL_COUNT"
+          fi
+
+          echo "✓ Security scan completed"
+
+      - name: Comment security results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const message = status === 'success'
+              ? '✅ **Security Scan Passed** - No critical vulnerabilities detected!'
+              : '⚠️ **Security Scan Completed** - Please review security reports for any issues.';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+
+  # ============================================================================
+  # Job 5: Docker Build Test
+  # ============================================================================
+  build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: shivx:pr-${{ github.event.pull_request.number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test Docker image
+        run: |
+          docker run --rm shivx:pr-${{ github.event.pull_request.number }} python -c "import app; print('✓ Import successful')"
+
+      - name: Comment build results
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const message = status === 'success'
+              ? '✅ **Docker Build Passed** - Image builds successfully!'
+              : '❌ **Docker Build Failed** - Please fix build errors.';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+
+  # ============================================================================
+  # Final Status Check (all jobs must pass)
+  # ============================================================================
+  pr-validation-complete:
+    name: PR Validation Complete
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test, security, build]
+    if: always()
+
+    steps:
+      - name: Check all jobs status
+        run: |
+          echo "Lint: ${{ needs.lint.result }}"
+          echo "Type Check: ${{ needs.typecheck.result }}"
+          echo "Tests: ${{ needs.test.result }}"
+          echo "Security: ${{ needs.security.result }}"
+          echo "Build: ${{ needs.build.result }}"
+
+          if [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.typecheck.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.security.result }}" != "success" ] || \
+             [ "${{ needs.build.result }}" != "success" ]; then
+            echo "❌ Some checks failed"
+            exit 1
+          else
+            echo "✅ All checks passed"
+          fi
+
+      - name: Comment final status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const lintResult = '${{ needs.lint.result }}';
+            const typecheckResult = '${{ needs.typecheck.result }}';
+            const testResult = '${{ needs.test.result }}';
+            const securityResult = '${{ needs.security.result }}';
+            const buildResult = '${{ needs.build.result }}';
+
+            const allPassed = [lintResult, typecheckResult, testResult, securityResult, buildResult]
+              .every(result => result === 'success');
+
+            const resultEmoji = (result) => result === 'success' ? '✅' : '❌';
+
+            const message = `
+            ## PR Validation Results
+
+            | Check | Status |
+            |-------|--------|
+            | Linting | ${resultEmoji(lintResult)} ${lintResult} |
+            | Type Checking | ${resultEmoji(typecheckResult)} ${typecheckResult} |
+            | Tests | ${resultEmoji(testResult)} ${testResult} |
+            | Security | ${resultEmoji(securityResult)} ${securityResult} |
+            | Build | ${resultEmoji(buildResult)} ${buildResult} |
+
+            ${allPassed
+              ? '✅ **All checks passed!** This PR is ready for review.'
+              : '❌ **Some checks failed.** Please fix the issues before merging.'}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
