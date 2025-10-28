@@ -150,10 +150,15 @@ Repository = "https://github.com/ojaydev11/shivx"
 "Bug Tracker" = "https://github.com/ojaydev11/shivx/issues"
 
 [project.scripts]
-shivx = "main:main"
+shivx-agi = "cli.shivx_cli:cli"
+shivx-app = "main:main"
 
 [tool.setuptools]
-packages = ["app", "core", "utils", "security", "config"]
+packages = [
+    "app", "core", "utils", "security", "config",
+    "memory", "learning", "vision", "sim", "reasoners",
+    "cognition", "resilience", "daemons", "telemetry", "cli"
+]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.yml", "*.json", "*.txt"]

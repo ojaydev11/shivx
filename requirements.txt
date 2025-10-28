@@ -62,16 +62,18 @@ pandas==2.1.4                   # Data manipulation
 scikit-learn==1.4.0             # Machine learning algorithms
 
 # ----------------------------------------------------------------------------
-# Reinforcement Learning
+# Reinforcement Learning & Spatial Reasoning
 # ----------------------------------------------------------------------------
 gymnasium==0.29.1               # RL environments (formerly gym)
 stable-baselines3==2.2.1        # RL algorithms (PPO, A2C, etc.)
+minigrid==2.3.1                 # Minimal gridworld environment (for spatial reasoning)
 
 # ----------------------------------------------------------------------------
 # NLP & Sentiment Analysis
 # ----------------------------------------------------------------------------
-# transformers==4.36.2          # HuggingFace transformers (uncomment if needed)
-# sentencepiece==0.1.99         # Tokenization (transformers dependency)
+transformers==4.36.2            # HuggingFace transformers (required for AGI)
+sentence-transformers==2.2.2    # Sentence embeddings (for memory system)
+sentencepiece==0.1.99           # Tokenization (transformers dependency)
 
 # ----------------------------------------------------------------------------
 # Data Processing & Analysis
@@ -105,6 +107,7 @@ toml==0.10.2                    # TOML parsing
 click==8.1.7                    # CLI framework
 rich==13.7.0                    # Terminal formatting
 psutil==5.9.7                   # System monitoring
+loguru==0.7.2                   # Advanced logging (for AGI modules)
 
 # ----------------------------------------------------------------------------
 # Rate Limiting

@@ -1,0 +1,228 @@
+# ============================================================================
+# ShivX AGI Configuration
+# ============================================================================
+
+# Semantic Long-Term Memory Graph (SLMG)
+memory:
+  enabled: true
+
+  # Graph database configuration
+  graph_store:
+    backend: "litegraph"  # litegraph, neo4j, memgraph
+    db_path: "./data/memory/graph.db"
+    max_nodes: 100000
+    index_type: "hnsw"  # hnsw, annoy, faiss
+
+  # Embedding configuration
+  encoders:
+    text_model: "sentence-transformers/all-MiniLM-L6-v2"
+    image_model: "openai/clip-vit-base-patch32"
+    audio_model: null
+    embedding_dim: 384
+    device: "cpu"  # cpu, cuda, mps
+
+  # Consolidation settings
+  consolidation:
+    enabled: true
+    schedule: "daily"  # daily, hourly, continuous
+    merge_threshold: 0.85  # similarity threshold for merging nodes
+    decay_rate: 0.95  # importance decay per consolidation cycle
+    min_importance: 0.1  # prune nodes below this importance
+
+  # Retrieval settings
+  retrieval:
+    default_k: 10
+    modes: ["episodic", "semantic", "procedural"]
+    hybrid_weights:
+      dense: 0.5
+      sparse: 0.3
+      graph: 0.2
+    max_hops: 3  # maximum graph traversal depth
+
+  # Memory types
+  episodic:
+    retention_days: 365
+    auto_tag: true
+
+  semantic:
+    confidence_threshold: 0.7
+    provenance_tracking: true
+
+  procedural:
+    max_steps: 50
+    versioning: true
+
+# Continuous Lifelong Learning (CLL)
+learning:
+  enabled: true
+
+  # Adapter configuration
+  online_adapter:
+    method: "lora"  # lora, prefix, adapter
+    rank: 8
+    alpha: 16
+    dropout: 0.1
+    target_modules: ["q_proj", "v_proj"]
+
+  # Experience buffer
+  experience_buffer:
+    max_size: 10000
+    sampling_strategy: "importance"  # importance, uniform, recency
+    priority_alpha: 0.6
+
+  # Training scheduler
+  scheduler:
+    mode: "idle"  # idle, scheduled, continuous
+    idle_threshold_seconds: 300
+    batch_size: 16
+    max_steps_per_session: 100
+    learning_rate: 0.0001
+    warmup_steps: 10
+
+  # Safety
+  regression_testing:
+    enabled: true
+    golden_task_count: 50
+    min_pass_rate: 0.95
+    rollback_on_failure: true
+
+# Spatial/Embodied Reasoning (SER)
+spatial:
+  enabled: true
+
+  # Vision parser
+  parser:
+    ocr_enabled: true
+    object_detection: "yolo"
+    relationship_extraction: true
+
+  # Simulator
+  simulator:
+    backend: "minigrid"  # minigrid, pybullet, mujoco
+    default_world: "empty-8x8"
+    render_mode: "rgb_array"
+
+  # Planner
+  planner:
+    algorithm: "astar"  # astar, rrt, neural
+    max_iterations: 1000
+    neural_hints: true
+
+# Theory of Mind (ToM)
+tom:
+  enabled: true
+
+  # Agent modeling
+  max_agents: 10
+  belief_depth: 2  # "I think that you think that..."
+  update_strategy: "bayesian"  # bayesian, neural, symbolic
+
+  # Reasoning
+  conflict_resolution: true
+  persuasion_planning: false
+  teaching_mode: true
+
+  # Evaluation
+  eval_tasks:
+    - "sally_anne"
+    - "smarties"
+    - "meeting_assistant"
+
+# Reflective Self-Audit & Self-Repair (RSR)
+reflection:
+  enabled: true
+
+  # Monitoring
+  reflector:
+    hallucination_detection: true
+    confidence_threshold: 0.8
+    evidence_retrieval: true
+    external_validation: false  # requires network
+
+  # Self-repair
+  self_repair:
+    enabled: true
+    auto_patch: false  # requires approval
+    sandbox_test: true
+    max_fix_attempts: 3
+
+  # Scorecards
+  scorecards:
+    metrics:
+      - "recall_accuracy"
+      - "learning_delta"
+      - "spatial_success"
+      - "tom_accuracy"
+      - "hallucination_rate"
+    history_days: 30
+    alert_threshold: 0.2  # 20% degradation
+
+# Autonomy Daemons
+daemons:
+  enabled: true
+
+  # Supervisor
+  supervisor:
+    restart_policy: "on-failure"
+    max_restarts: 5
+    restart_interval_seconds: 60
+    health_check_interval: 30
+
+  # Individual daemons
+  memory_daemon:
+    enabled: true
+    priority: "normal"
+
+  learning_daemon:
+    enabled: true
+    priority: "low"
+
+  reflection_daemon:
+    enabled: true
+    priority: "normal"
+
+  telemetry_daemon:
+    enabled: true
+    priority: "high"
+
+  scheduler_daemon:
+    enabled: true
+    priority: "normal"
+
+# Telemetry (local only)
+telemetry:
+  enabled: true
+  local_only: true
+
+  # Metrics
+  metrics:
+    port: 9091
+    retention_days: 7
+
+  # Dashboard
+  dashboard:
+    enabled: true
+    port: 8001
+    auto_open: false
+
+  # Alerts
+  alerts:
+    enabled: true
+    channels: ["log"]  # log, slack, email (requires config)
+
+# Security
+security:
+  safe_self_repair: true
+  network_isolation: true
+  allow_net: false
+  code_signing: true
+  audit_all_changes: true
+
+# Feature Flags
+features:
+  slmg: true
+  cll: true
+  spatial: true
+  tom: true
+  reflection: true
+  daemons: true
