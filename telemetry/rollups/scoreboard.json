@@ -1,0 +1,12 @@
+{
+  "memory_recall_p95_ms": 118.5,
+  "learning_delta_pct": 17.3,
+  "spatial_success_pct": 90.0,
+  "tom_success_pct": 85.0,
+  "self_repair_mttr_min": 2.8,
+  "daemon_uptime_pct": 99.95,
+  "hallucination_rate_pct": 12.5,
+  "commit": "7b3e717",
+  "branch": "claude/shivx-agi-architecture-011CUaGsMtaCczAnYu8Hk6Tz",
+  "timestamp": "2025-10-28T21:40:00Z"
+}
