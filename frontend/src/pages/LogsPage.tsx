@@ -27,7 +27,7 @@ import {
 import { Search, Refresh, FilterList } from '@mui/icons-material';
 import { api, handleAPIError } from '@services/api';
 import { useStore } from '@store/index';
-import { LogEntry } from '@types/index';
+import { LogEntry } from '../types';
 
 export default function LogsPage() {
   const { logs, addLog } = useStore();

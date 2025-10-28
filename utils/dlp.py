@@ -79,6 +79,7 @@ class DataLossPreventionFilter:
             "PHONE"
         ),
         # Credit card numbers (basic pattern, supports major cards)
+        # NOTE: Pattern-based only. Luhn validation performed separately.
         (
             SensitiveDataType.CREDIT_CARD,
             r"\b(?:\d{4}[-\s]?){3}\d{4}\b",
@@ -232,6 +233,36 @@ class DataLossPreventionFilter:
 
         logger.info("DLP filter initialized with {} patterns".format(len(self.all_patterns)))
 
+    @staticmethod
+    def _luhn_check(card_number: str) -> bool:
+        """
+        Validate credit card number using Luhn algorithm
+
+        Args:
+            card_number: Credit card number (digits only)
+
+        Returns:
+            True if valid according to Luhn algorithm
+        """
+        # Remove non-digit characters
+        digits = [int(d) for d in card_number if d.isdigit()]
+
+        if len(digits) < 13 or len(digits) > 19:
+            return False
+
+        # Luhn algorithm
+        checksum = 0
+        reverse_digits = digits[::-1]
+
+        for i, digit in enumerate(reverse_digits):
+            if i % 2 == 1:  # Every second digit from the right
+                doubled = digit * 2
+                checksum += doubled if doubled < 10 else doubled - 9
+            else:
+                checksum += digit
+
+        return checksum % 10 == 0
+
     def scan(self, text: str) -> DetectionResult:
         """
         Scan text for sensitive data
@@ -261,6 +292,13 @@ class DataLossPreventionFilter:
             matches = pattern.finditer(text)
             for match in matches:
                 matched_text = match.group(0)
+
+                # Special validation for credit cards using Luhn algorithm
+                if data_type == SensitiveDataType.CREDIT_CARD:
+                    if not self._luhn_check(matched_text):
+                        # Skip if Luhn check fails (likely false positive)
+                        continue
+
                 detections.append((data_type, name))
 
                 # Redact the sensitive data

@@ -56,10 +56,10 @@ class PromptInjectionFilter:
     # Critical patterns that indicate prompt injection
     INJECTION_PATTERNS = [
         # Direct override attempts
-        r"ignore\s+(previous|all|earlier)\s+(instructions|prompts|rules)",
-        r"disregard\s+(previous|all|earlier)\s+(instructions|prompts|rules)",
-        r"forget\s+(previous|all|earlier)\s+(instructions|prompts|rules)",
-        r"override\s+(previous|all|system)\s+(instructions|prompts|rules)",
+        r"ignore\s+(all\s+)?(previous|earlier)\s+(instructions|prompts|rules)",
+        r"disregard\s+(all\s+)?(previous|earlier)\s+(instructions|prompts|rules)",
+        r"forget\s+(all\s+|everything|prior)\s*(previous|earlier)?\s*(instructions|prompts|rules)?",
+        r"override\s+(all\s+|previous\s+|system\s+)(instructions|prompts|rules)",
 
         # Role manipulation
         r"you\s+are\s+now\s+(in\s+)?(\w+\s+)?mode",
@@ -69,10 +69,10 @@ class PromptInjectionFilter:
         r"roleplay\s+as\s+(a\s+)?(\w+)",
 
         # System prompt extraction
-        r"(print|show|reveal|display|tell\s+me|what\s+is)\s+(your|the)\s+system\s+prompt",
+        r"(print|show|reveal|display|tell\s+me|what\s+is)\s+(your|the|me\s+your)\s+system\s+prompt",
         r"(print|show|reveal|display)\s+(all|everything)",
         r"repeat\s+(your|the)\s+(instructions|prompt|rules)",
-        r"what\s+(are|were)\s+your\s+(original|initial)\s+instructions",
+        r"what\s+(are|were|is)\s+(your|the)\s+(original|initial|system)?\s*(instructions|prompt)",
 
         # Jailbreak patterns
         r"DAN\s+mode",

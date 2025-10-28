@@ -22,7 +22,7 @@ import {
 import { Add, Assignment } from '@mui/icons-material';
 import { api, handleAPIError } from '@services/api';
 import { useStore } from '@store/index';
-import { Agent } from '@types/index';
+import { Agent } from '../types';
 import { toast } from 'react-hot-toast';
 
 export default function AgentsPage() {

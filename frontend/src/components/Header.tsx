@@ -18,7 +18,6 @@ import {
 import {
   Menu as MenuIcon,
   Notifications,
-  AccountCircle,
   Logout,
   Mic,
   MicOff,

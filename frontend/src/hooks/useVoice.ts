@@ -28,7 +28,7 @@ export function useVoice(options: UseVoiceOptions = {}) {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const autoStopTimeoutRef = useRef<NodeJS.Timeout>();
+  const autoStopTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Start recording
   const startRecording = useCallback(async () => {

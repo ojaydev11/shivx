@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { WebSocketMessage } from '@types/index';
+import type { WebSocketMessage } from '../types';
 
 interface UseWebSocketOptions {
   url?: string;
@@ -29,8 +29,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
-  const heartbeatIntervalRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval>>();
 
   const connect = useCallback(() => {
     try {

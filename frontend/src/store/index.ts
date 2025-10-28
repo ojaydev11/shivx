@@ -4,7 +4,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, Agent, Task, Position, SystemHealth, Settings, LogEntry } from '@types/index';
+import { User, Agent, Task, Position, SystemHealth, Settings, LogEntry } from '../types';
 
 interface AppState {
   // Auth

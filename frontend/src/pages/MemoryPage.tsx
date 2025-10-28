@@ -23,7 +23,7 @@ import {
 } from '@mui/material';
 import { Search } from '@mui/icons-material';
 import { api, handleAPIError } from '@services/api';
-import { MemoryEntry } from '@types/index';
+import { MemoryEntry } from '../types';
 
 export default function MemoryPage() {
   const [memories, setMemories] = useState<MemoryEntry[]>([]);

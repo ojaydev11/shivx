@@ -15,6 +15,9 @@ from config.settings import Settings
 from core.security.hardening import Permission
 from utils.prompt_filter import get_prompt_filter, ThreatLevel
 from utils.content_moderation import get_content_moderator, ModerationSeverity
+from core.memory.rag import RAGPipeline, RAGConfig
+from core.memory.long_term_memory import LongTermMemory, MemoryType
+from core.memory.conversation_memory import ConversationMemory
 import logging
 
 logger = logging.getLogger(__name__)
@@ -447,6 +450,7 @@ async def get_ai_capabilities(
         "dex_arbitrage": settings.feature_dex_arbitrage,
         "metacognition": settings.feature_metacognition,
         "explainability": True,
+        "memory_rag": True,  # New RAG capability
         "available_models": [
             "RL Trading (PPO)",
             "LSTM Price Predictor",
@@ -454,3 +458,325 @@ async def get_ai_capabilities(
             "Arbitrage Detector"
         ]
     }
+
+
+# ============================================================================
+# Memory & RAG Endpoints
+# ============================================================================
+
+class MemoryStoreRequest(BaseModel):
+    """Request to store memory"""
+    content: str = Field(..., description="Memory content")
+    memory_type: str = Field(..., description="Memory type: episodic, semantic, or procedural")
+    importance: float = Field(default=0.5, ge=0, le=1, description="Importance score")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+
+
+class MemoryRetrieveRequest(BaseModel):
+    """Request to retrieve memories"""
+    query: str = Field(..., description="Search query")
+    memory_type: Optional[str] = Field(default=None, description="Filter by memory type")
+    k: int = Field(default=10, ge=1, le=50, description="Number of results")
+
+
+class RAGChatRequest(BaseModel):
+    """Request for RAG-enhanced chat"""
+    message: str = Field(..., description="User message")
+    session_id: Optional[str] = Field(default=None, description="Conversation session ID")
+    use_rag: bool = Field(default=True, description="Use RAG for context")
+    max_context_tokens: int = Field(default=4000, description="Max context tokens")
+
+
+class RAGChatResponse(BaseModel):
+    """Response from RAG-enhanced chat"""
+    response: str
+    session_id: str
+    contexts_used: int
+    confidence_score: float
+    hallucination_detected: bool
+    warnings: List[str] = []
+    metadata: Dict[str, Any] = {}
+
+
+# Initialize memory systems (singleton pattern)
+_long_term_memory = None
+_conversation_memory = None
+_rag_pipeline = None
+
+
+def get_memory_systems():
+    """Get or create memory system instances"""
+    global _long_term_memory, _conversation_memory, _rag_pipeline
+
+    if _long_term_memory is None:
+        _long_term_memory = LongTermMemory()
+        logger.info("Initialized long-term memory")
+
+    if _conversation_memory is None:
+        _conversation_memory = ConversationMemory()
+        logger.info("Initialized conversation memory")
+
+    if _rag_pipeline is None:
+        _rag_pipeline = RAGPipeline(_long_term_memory)
+        logger.info("Initialized RAG pipeline")
+
+    return _long_term_memory, _conversation_memory, _rag_pipeline
+
+
+@router.post("/memory/store")
+async def store_memory(
+    request: MemoryStoreRequest,
+    current_user: TokenData = Depends(require_permission(Permission.WRITE)),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Store a memory in long-term storage
+
+    Requires: WRITE permission
+
+    Args:
+        request: Memory storage request
+    """
+    try:
+        memory, _, _ = get_memory_systems()
+
+        # Validate memory type
+        try:
+            mem_type = MemoryType(request.memory_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid memory type. Must be: episodic, semantic, or procedural"
+            )
+
+        # Store memory
+        memory_id = memory.store(
+            content=request.content,
+            memory_type=mem_type,
+            source=current_user.username,
+            importance_score=request.importance,
+            metadata=request.metadata or {}
+        )
+
+        return {
+            "memory_id": memory_id,
+            "status": "stored",
+            "memory_type": request.memory_type,
+            "importance": request.importance
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to store memory: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to store memory: {str(e)}"
+        )
+
+
+@router.post("/memory/retrieve")
+async def retrieve_memories(
+    request: MemoryRetrieveRequest,
+    current_user: TokenData = Depends(require_permission(Permission.READ)),
+):
+    """
+    Retrieve memories using semantic search
+
+    Requires: READ permission
+
+    Args:
+        request: Memory retrieval request
+    """
+    try:
+        memory, _, _ = get_memory_systems()
+
+        # Parse memory type filter
+        mem_type = None
+        if request.memory_type:
+            try:
+                mem_type = MemoryType(request.memory_type)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid memory type"
+                )
+
+        # Retrieve memories
+        results = memory.retrieve(
+            query=request.query,
+            memory_type=mem_type,
+            k=request.k
+        )
+
+        # Format results
+        formatted_results = [
+            {
+                "memory_id": mem.memory_id,
+                "content": mem.content,
+                "memory_type": mem.memory_type.value,
+                "importance": mem.importance_score,
+                "relevance_score": score,
+                "created_at": mem.created_at.isoformat(),
+                "access_count": mem.access_count
+            }
+            for mem, score in results
+        ]
+
+        return {
+            "query": request.query,
+            "results": formatted_results,
+            "count": len(formatted_results)
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to retrieve memories: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve memories: {str(e)}"
+        )
+
+
+@router.post("/chat/rag", response_model=RAGChatResponse)
+async def chat_with_rag(
+    request: RAGChatRequest,
+    current_user: TokenData = Depends(require_permission(Permission.EXECUTE)),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Chat with RAG (Retrieval-Augmented Generation)
+
+    Enhances responses with relevant context from long-term memory.
+
+    Requires: EXECUTE permission
+
+    Args:
+        request: RAG chat request
+
+    Security:
+        - Input validation for prompt injection
+        - Content moderation
+        - Output validation
+    """
+    try:
+        memory, conv_memory, rag_pipeline = get_memory_systems()
+
+        # SECURITY: Validate input
+        prompt_filter = get_prompt_filter(strict_mode=True)
+        input_validation = prompt_filter.filter_input(request.message)
+
+        if not input_validation.is_safe:
+            logger.warning(f"Prompt injection detected: {input_validation.detected_threats}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "Invalid input detected",
+                    "threat_level": input_validation.threat_level.value
+                }
+            )
+
+        # Get or create conversation session
+        session_id = request.session_id
+        if not session_id:
+            session = conv_memory.create_session(user_id=current_user.username)
+            session_id = session.session_id
+        else:
+            session = conv_memory.get_session(session_id)
+            if not session:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Session not found"
+                )
+
+        # Add user message to conversation
+        conv_memory.add_message(session_id, "user", request.message)
+
+        # Mock LLM callback (replace with actual LLM integration)
+        def llm_callback(prompt: str) -> str:
+            # This is a placeholder - integrate with OpenAI/Anthropic/etc
+            return f"This is a RAG-enhanced response to: {request.message}. [Based on retrieved context]"
+
+        # Generate response with RAG
+        if request.use_rag:
+            rag_config = RAGConfig(max_context_tokens=request.max_context_tokens)
+            rag_pipeline.config = rag_config
+
+            rag_result = rag_pipeline.generate(
+                query=request.message,
+                llm_callback=llm_callback,
+                include_metadata=True
+            )
+
+            response_text = rag_result.response
+            contexts_used = len(rag_result.contexts)
+            confidence = rag_result.confidence_score
+            hallucination = rag_result.hallucination_detected
+            warnings = rag_result.warnings
+            metadata = rag_result.metadata
+        else:
+            # Direct LLM without RAG
+            response_text = llm_callback(request.message)
+            contexts_used = 0
+            confidence = 0.7
+            hallucination = False
+            warnings = []
+            metadata = {}
+
+        # SECURITY: Validate output
+        output_validation = prompt_filter.filter_output(response_text)
+        if not output_validation.is_safe:
+            logger.critical(f"Secret leak detected in response")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Output validation failed"
+            )
+
+        # Add assistant message to conversation
+        conv_memory.add_message(
+            session_id,
+            "assistant",
+            response_text,
+            metadata={"rag_enabled": request.use_rag, "contexts_used": contexts_used}
+        )
+
+        return RAGChatResponse(
+            response=response_text,
+            session_id=session_id,
+            contexts_used=contexts_used,
+            confidence_score=confidence,
+            hallucination_detected=hallucination,
+            warnings=warnings,
+            metadata=metadata
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"RAG chat failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Chat failed: {str(e)}"
+        )
+
+
+@router.get("/memory/stats")
+async def get_memory_stats(
+    current_user: TokenData = Depends(require_permission(Permission.READ))
+):
+    """
+    Get memory system statistics
+
+    Requires: READ permission
+    """
+    try:
+        memory, conv_memory, _ = get_memory_systems()
+
+        return {
+            "long_term_memory": memory.get_stats(),
+            "conversation_memory": conv_memory.get_stats()
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get stats: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get stats: {str(e)}"
+        )

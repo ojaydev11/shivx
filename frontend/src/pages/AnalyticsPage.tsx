@@ -31,7 +31,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { api, handleAPIError } from '@services/api';
-import { AnalyticsMetrics } from '@types/index';
+import { AnalyticsMetrics } from '../types';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
@@ -192,8 +192,8 @@ export default function AnalyticsPage() {
                         outerRadius={100}
                         label
                       >
-                        {metrics.strategyPerformance.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        {metrics.strategyPerformance.map((_entry, _index) => (
+                          <Cell key={`cell-${_index}`} fill={COLORS[_index % COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip />

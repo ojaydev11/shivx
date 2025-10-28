@@ -70,8 +70,17 @@ stable-baselines3==2.2.1        # RL algorithms (PPO, A2C, etc.)
 # ----------------------------------------------------------------------------
 # NLP & Sentiment Analysis
 # ----------------------------------------------------------------------------
-# transformers==4.36.2          # HuggingFace transformers (uncomment if needed)
+vaderSentiment==3.3.2           # Sentiment analysis (for emotion detection)
+textblob==0.17.1                # Alternative sentiment analysis
+# transformers==4.36.2          # HuggingFace transformers (uncomment for better accuracy)
 # sentencepiece==0.1.99         # Tokenization (transformers dependency)
+
+# ----------------------------------------------------------------------------
+# Memory & RAG (Retrieval-Augmented Generation)
+# ----------------------------------------------------------------------------
+chromadb==0.4.22                # Vector database for semantic search
+sentence-transformers==2.3.1    # Sentence embeddings for semantic similarity
+scikit-learn==1.4.0             # Already included above but needed for cosine similarity
 
 # ----------------------------------------------------------------------------
 # Data Processing & Analysis
@@ -123,6 +132,21 @@ jsonschema==4.20.0              # JSON schema validation
 # ----------------------------------------------------------------------------
 solana==0.30.2                  # Solana Python SDK
 # solders==0.18.1               # Solana Rust bindings (if needed)
+
+# ----------------------------------------------------------------------------
+# Voice I/O (Speech-to-Text & Text-to-Speech)
+# ----------------------------------------------------------------------------
+openai-whisper==20231117        # Speech-to-text (Whisper)
+pyttsx3==2.90                   # Text-to-speech
+# vosk==0.3.45                  # Alternative offline STT (uncomment if needed)
+# TTS==0.22.0                   # Coqui TTS for better quality (uncomment if needed)
+pydub==0.25.1                   # Audio format conversion
+ffmpeg-python==0.2.0            # FFmpeg wrapper for audio processing
+
+# ----------------------------------------------------------------------------
+# WebSocket Support
+# ----------------------------------------------------------------------------
+websockets==12.0                # WebSocket server/client
 
 # ----------------------------------------------------------------------------
 # External API Clients

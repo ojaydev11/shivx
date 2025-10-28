@@ -291,6 +291,81 @@ ci: ## Run CI checks locally (lint + test + security)
 	@make security
 	@echo "$(GREEN)✓ CI checks passed$(NC)"
 
+##@ DevOps & Release
+
+validate-env: ## Validate development environment setup
+	@echo "$(BLUE)Validating environment...$(NC)"
+	@./scripts/validate_dev_env.sh
+	@echo "$(GREEN)✓ Environment validation complete$(NC)"
+
+validate-env-fix: ## Validate and auto-fix environment issues
+	@./scripts/validate_dev_env.sh --fix
+
+build-windows: ## Build Windows .exe executable
+	@echo "$(BLUE)Building Windows executable...$(NC)"
+	@if [ -f "scripts/build_windows.sh" ]; then \
+		./scripts/build_windows.sh --clean; \
+	elif [ -f "scripts/build_windows.ps1" ]; then \
+		powershell -ExecutionPolicy Bypass -File scripts/build_windows.ps1 -Clean; \
+	else \
+		echo "$(RED)Build script not found$(NC)"; \
+		exit 1; \
+	fi
+
+sign-artifacts: ## Sign release artifacts (GPG + cosign)
+	@echo "$(BLUE)Signing artifacts...$(NC)"
+	@./scripts/sign_artifacts.sh --all
+	@echo "$(GREEN)✓ Artifacts signed$(NC)"
+
+verify-signatures: ## Verify artifact signatures
+	@echo "$(BLUE)Verifying signatures...$(NC)"
+	@./scripts/verify_signatures.sh --all
+	@echo "$(GREEN)✓ Signatures verified$(NC)"
+
+release: ## Create automated release (version bump, build, tag)
+	@echo "$(BLUE)Creating release...$(NC)"
+	@./scripts/release.sh
+	@echo "$(GREEN)✓ Release complete$(NC)"
+
+release-patch: ## Create patch release (x.x.X)
+	@./scripts/release.sh --patch
+
+release-minor: ## Create minor release (x.X.0)
+	@./scripts/release.sh --minor
+
+release-major: ## Create major release (X.0.0)
+	@./scripts/release.sh --major
+
+release-dry-run: ## Test release process without making changes
+	@DRY_RUN=true ./scripts/release.sh
+
+reproducible-build: ## Create reproducible build
+	@echo "$(BLUE)Creating reproducible build...$(NC)"
+	@export SOURCE_DATE_EPOCH=$$(git log -1 --format=%ct) && \
+	docker build \
+		--build-arg SOURCE_DATE_EPOCH=$$SOURCE_DATE_EPOCH \
+		-t shivx:reproducible \
+		.
+	@echo "$(GREEN)✓ Reproducible build complete$(NC)"
+
+reproducible-verify: ## Verify build reproducibility
+	@echo "$(BLUE)Verifying build reproducibility...$(NC)"
+	@echo "Building first time..."
+	@make reproducible-build > /tmp/build1.log 2>&1
+	@HASH1=$$(docker images --no-trunc --quiet shivx:reproducible)
+	@docker tag shivx:reproducible shivx:reproducible-test1
+	@echo "Building second time..."
+	@make reproducible-build > /tmp/build2.log 2>&1
+	@HASH2=$$(docker images --no-trunc --quiet shivx:reproducible)
+	@if [ "$$HASH1" = "$$HASH2" ]; then \
+		echo "$(GREEN)✓ Build is reproducible! Hash: $$HASH1$(NC)"; \
+	else \
+		echo "$(RED)✗ Build is NOT reproducible$(NC)"; \
+		echo "  Hash 1: $$HASH1"; \
+		echo "  Hash 2: $$HASH2"; \
+		exit 1; \
+	fi
+
 ##@ Quick Commands
 
 all: setup test lint security pack ## Run setup, test, lint, security, and pack

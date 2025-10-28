@@ -39,6 +39,11 @@ from app.routes.health import router as health_router
 from app.routers.trading import router as trading_router
 from app.routers.analytics import router as analytics_router
 from app.routers.ai import router as ai_router
+from app.routers.voice import router as voice_router
+from app.routers.privacy import router as privacy_router
+
+# Import WebSocket
+from app.websocket import websocket_endpoint, manager, rate_limit_reset_task
 
 # Import security
 from core.security.hardening import SecurityHardeningEngine
@@ -78,6 +83,60 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     logger.info(f"✓ Configuration loaded (env: {settings.env.value})")
 
+    # ========================================================================
+    # Privacy and Compliance Initialization
+    # ========================================================================
+
+    # Initialize offline mode
+    from core.privacy.offline import get_offline_mode
+    offline = get_offline_mode()
+    if offline.is_enabled():
+        logger.warning("🔒 OFFLINE MODE ENABLED - External network access blocked")
+        offline.verify_on_startup()
+        status = offline.get_status()
+        if status["isolated"]:
+            logger.info("✓ Network isolation verified")
+        else:
+            logger.warning(f"⚠️  Partial isolation: {len(status.get('warnings', []))} warnings")
+    else:
+        logger.info("✓ Offline mode: disabled (full network access)")
+
+    # Initialize air-gap mode
+    from core.privacy.airgap import get_airgap_mode
+    airgap = get_airgap_mode()
+    if airgap.is_enabled():
+        logger.warning("🔒 AIR-GAP MODE ENABLED - Maximum network isolation")
+        try:
+            airgap.verify_on_startup()
+            logger.info("✓ Air-gap verification passed")
+        except Exception as e:
+            logger.critical(f"❌ Air-gap verification failed: {e}")
+            raise
+    else:
+        logger.info("✓ Air-gap mode: disabled")
+
+    # Log privacy settings
+    privacy_config = {
+        "offline_mode": settings.offline_mode,
+        "airgap_mode": settings.airgap_mode,
+        "telemetry_mode": settings.telemetry_mode,
+        "gdpr_mode": settings.gdpr_mode,
+        "respect_dnt": settings.respect_dnt,
+    }
+    logger.info(f"✓ Privacy configuration: {privacy_config}")
+
+    # Initialize telemetry (respects privacy settings)
+    from core.deployment.production_telemetry import get_production_telemetry
+    telemetry = get_production_telemetry()
+    if telemetry.is_enabled():
+        logger.info(f"✓ Telemetry enabled (mode: {settings.telemetry_mode})")
+    else:
+        logger.info("✓ Telemetry disabled (privacy mode active)")
+
+    app.state.offline = offline
+    app.state.airgap = airgap
+    app.state.telemetry = telemetry
+
     # Log feature flags
     features = settings.get_feature_flags()
     enabled_features = [k for k, v in features.items() if v]
@@ -95,6 +154,11 @@ async def lifespan(app: FastAPI):
     # app.state.trading_engine = await init_trading_engine(settings)
     # app.state.ml_models = await load_ml_models(settings)
 
+    # Start WebSocket rate limit reset task
+    import asyncio
+    app.state.rate_limit_task = asyncio.create_task(rate_limit_reset_task())
+    logger.info("✓ WebSocket rate limit task started")
+
     logger.info("✓ Application startup complete")
     logger.info("=" * 70)
 
@@ -102,6 +166,14 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down ShivX AI Trading System...")
+
+    # Stop WebSocket rate limit task
+    if hasattr(app.state, "rate_limit_task"):
+        app.state.rate_limit_task.cancel()
+        try:
+            await app.state.rate_limit_task
+        except asyncio.CancelledError:
+            pass
 
     # Cleanup resources
     # await app.state.database.close()
@@ -278,8 +350,13 @@ def create_app() -> FastAPI:
     app.include_router(trading_router)
     app.include_router(analytics_router)
     app.include_router(ai_router)
+    app.include_router(voice_router)
+    app.include_router(privacy_router)  # Privacy and GDPR compliance endpoints
 
-    logger.info("✓ Routes configured")
+    # Add WebSocket endpoint
+    app.add_api_websocket_route("/ws", websocket_endpoint)
+
+    logger.info("✓ Routes configured (including WebSocket)")
 
     return app
 
