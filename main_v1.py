@@ -1,19 +1,15 @@
 """
-ShivX AI Trading System - Main Application (v2.0)
-Production-ready FastAPI application with:
-- Centralized configuration (Pydantic Settings)
-- JWT authentication
-- IP-based rate limiting
-- Comprehensive routers (Trading, Analytics, AI)
-- Dependency injection
-- Security hardening
-- Monitoring & observability
+ShivX AI Trading System - Main Application Entry Point
+Production-ready FastAPI application with comprehensive security
 
-Run with: uvicorn main_v2:app --host 0.0.0.0 --port 8000
+Run with: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 """
 
+import os
+import sys
 import logging
 from contextlib import asynccontextmanager
+from typing import List
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,14 +17,8 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 
-# Configuration
-from config.settings import get_settings
-
-# Import logging setup
+# Import logging setup first
 from utils.logging_setup import setup_logging
 
 # Setup logging
@@ -36,22 +26,14 @@ logger = setup_logging(__name__)
 
 # Import routes
 from app.routes.health import router as health_router
-from app.routers.trading import router as trading_router
-from app.routers.analytics import router as analytics_router
-from app.routers.ai import router as ai_router
 
-# Import security
+# Import security components
 from core.security.hardening import SecurityHardeningEngine
 
-# Get settings
-settings = get_settings()
-
-
-# ============================================================================
-# Rate Limiting Setup
-# ============================================================================
-
-limiter = Limiter(key_func=get_remote_address)
+# Version info
+VERSION = os.getenv("SHIVX_VERSION", "dev")
+GIT_SHA = os.getenv("SHIVX_GIT_SHA", "unknown")
+ENV = os.getenv("SHIVX_ENV", "local")
 
 
 # ============================================================================
@@ -66,34 +48,18 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("=" * 70)
-    logger.info(f"ShivX AI Trading System v{settings.version} ({settings.env.value})")
-    logger.info(f"Git SHA: {settings.git_sha}")
+    logger.info(f"ShivX AI Trading System v{VERSION} ({ENV})")
+    logger.info(f"Git SHA: {GIT_SHA}")
     logger.info("=" * 70)
 
     # Initialize security engine
     app.state.security = SecurityHardeningEngine()
     logger.info("✓ Security hardening engine initialized")
 
-    # Initialize settings
-    app.state.settings = settings
-    logger.info(f"✓ Configuration loaded (env: {settings.env.value})")
-
-    # Log feature flags
-    features = settings.get_feature_flags()
-    enabled_features = [k for k, v in features.items() if v]
-    logger.info(f"✓ Feature flags: {len(enabled_features)}/{len(features)} enabled")
-
-    # Trading mode warning
-    if settings.trading_mode.value == "live":
-        logger.warning("⚠️  LIVE TRADING MODE ENABLED - Real funds at risk!")
-    else:
-        logger.info(f"✓ Trading mode: {settings.trading_mode.value} (safe)")
-
-    # Initialize other components
-    # app.state.database = await init_database(settings)
-    # app.state.redis = await init_redis(settings)
-    # app.state.trading_engine = await init_trading_engine(settings)
-    # app.state.ml_models = await load_ml_models(settings)
+    # Initialize other components here
+    # app.state.database = await init_database()
+    # app.state.redis = await init_redis()
+    # app.state.trading_engine = await init_trading_engine()
 
     logger.info("✓ Application startup complete")
     logger.info("=" * 70)
@@ -106,7 +72,6 @@ async def lifespan(app: FastAPI):
     # Cleanup resources
     # await app.state.database.close()
     # await app.state.redis.close()
-    # await app.state.trading_engine.shutdown()
 
     logger.info("✓ Application shutdown complete")
 
@@ -117,22 +82,23 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """
-    Create and configure FastAPI application
+    Create and configure FastAPI application with security best practices
     """
+
+    # CORS configuration
+    cors_origins_str = os.getenv("SHIVX_CORS_ORIGINS", "http://localhost:3000")
+    cors_origins = [origin.strip() for origin in cors_origins_str.split(",")]
 
     # Create FastAPI app
     app = FastAPI(
         title="ShivX AI Trading System",
         description="Advanced autonomous AI trading platform with reinforcement learning and multi-strategy execution",
-        version=settings.version,
+        version=VERSION,
         lifespan=lifespan,
-        docs_url="/api/docs" if not settings.is_production else None,
-        redoc_url="/api/redoc" if not settings.is_production else None,
-        openapi_url="/api/openapi.json" if not settings.is_production else None,
+        docs_url="/api/docs" if ENV != "production" else None,  # Disable docs in production
+        redoc_url="/api/redoc" if ENV != "production" else None,
+        openapi_url="/api/openapi.json" if ENV != "production" else None,
     )
-
-    # Add rate limiter state
-    app.state.limiter = limiter
 
     # ========================================================================
     # Security Middleware
@@ -141,23 +107,24 @@ def create_app() -> FastAPI:
     # 1. CORS Middleware
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
         allow_headers=["*"],
         expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
     )
-    logger.info(f"✓ CORS configured for origins: {settings.cors_origins}")
+    logger.info(f"✓ CORS configured for origins: {cors_origins}")
 
     # 2. Trusted Host Middleware (prevent host header attacks)
-    if settings.is_production:
+    if ENV == "production":
+        trusted_hosts = os.getenv("SHIVX_TRUSTED_HOSTS", "*").split(",")
         app.add_middleware(
             TrustedHostMiddleware,
-            allowed_hosts=settings.trusted_hosts
+            allowed_hosts=trusted_hosts
         )
-        logger.info(f"✓ Trusted hosts configured: {settings.trusted_hosts}")
+        logger.info(f"✓ Trusted hosts configured: {trusted_hosts}")
 
-    # 3. Security Headers Middleware
+    # 3. Security Headers Middleware (custom)
     @app.middleware("http")
     async def add_security_headers(request: Request, call_next):
         """Add security headers to all responses"""
@@ -173,8 +140,8 @@ def create_app() -> FastAPI:
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
 
         # Custom headers
-        response.headers["X-ShivX-Version"] = settings.version
-        response.headers["X-Environment"] = settings.env.value
+        response.headers["X-ShivX-Version"] = VERSION
+        response.headers["X-Environment"] = ENV
 
         return response
 
@@ -194,20 +161,6 @@ def create_app() -> FastAPI:
     # ========================================================================
     # Exception Handlers
     # ========================================================================
-
-    @app.exception_handler(RateLimitExceeded)
-    async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
-        """Handle rate limit exceeded"""
-        return JSONResponse(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            content={
-                "error": {
-                    "code": 429,
-                    "message": "Rate limit exceeded. Please try again later.",
-                    "request_id": getattr(request.state, "request_id", "unknown")
-                }
-            }
-        )
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
@@ -247,7 +200,7 @@ def create_app() -> FastAPI:
             content={
                 "error": {
                     "code": 500,
-                    "message": "Internal server error" if settings.is_production else str(exc),
+                    "message": "Internal server error" if ENV == "production" else str(exc),
                     "request_id": getattr(request.state, "request_id", "unknown")
                 }
             }
@@ -259,25 +212,25 @@ def create_app() -> FastAPI:
 
     # Root endpoint
     @app.get("/", tags=["root"])
-    @limiter.limit("30/minute")
-    async def root(request: Request):
+    async def root():
         """Root endpoint with API information"""
         return {
             "service": "ShivX AI Trading System",
-            "version": settings.version,
-            "environment": settings.env.value,
+            "version": VERSION,
+            "environment": ENV,
             "status": "operational",
-            "trading_mode": settings.trading_mode.value,
-            "docs": "/api/docs" if not settings.is_production else "disabled",
-            "health": "/api/health/live",
-            "features": settings.get_feature_flags()
+            "docs": "/api/docs" if ENV != "production" else "disabled",
+            "health": "/api/health/live"
         }
 
     # Include routers
     app.include_router(health_router)
-    app.include_router(trading_router)
-    app.include_router(analytics_router)
-    app.include_router(ai_router)
+
+    # Additional routers would be included here:
+    # from app.routes.trading import router as trading_router
+    # from app.routes.analytics import router as analytics_router
+    # app.include_router(trading_router)
+    # app.include_router(analytics_router)
 
     logger.info("✓ Routes configured")
 
@@ -290,9 +243,6 @@ def create_app() -> FastAPI:
 
 app = create_app()
 
-# Add rate limit handler
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 
 # ============================================================================
 # Main Entry Point (for development)
@@ -301,14 +251,19 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 if __name__ == "__main__":
     import uvicorn
 
-    logger.info(f"Starting development server on {settings.host}:{settings.port}")
-    logger.info(f"Reload enabled: {settings.reload}")
+    # Configuration
+    host = os.getenv("SHIVX_HOST", "0.0.0.0")
+    port = int(os.getenv("SHIVX_PORT", "8000"))
+    reload = os.getenv("SHIVX_DEV", "false").lower() == "true"
+
+    logger.info(f"Starting development server on {host}:{port}")
+    logger.info(f"Reload enabled: {reload}")
 
     uvicorn.run(
-        "main_v2:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.reload,
-        log_level=settings.log_level.value.lower(),
+        "main:app",
+        host=host,
+        port=port,
+        reload=reload,
+        log_level="info",
         access_log=True,
     )
