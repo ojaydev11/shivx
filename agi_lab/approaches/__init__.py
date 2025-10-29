@@ -10,6 +10,7 @@ from .neurosymbolic import NeurosymbolicAI
 from .active_inference import ActiveInferenceAgent
 from .compositional import CompositionalReasoner
 from .analogical import AnalogicalReasoner
+from .hybrid import HybridAGI
 
 __all__ = [
     "BaseAGIApproach",
@@ -20,4 +21,5 @@ __all__ = [
     "ActiveInferenceAgent",
     "CompositionalReasoner",
     "AnalogicalReasoner",
+    "HybridAGI",
 ]
