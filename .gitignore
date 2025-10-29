@@ -90,6 +90,7 @@ data/knowledge.db
 data/memory/
 data/meta_learning.db
 data/semantic_memory.db
+data/agi_lab/
 memory/agi_test_report.json
 memory/autonomous_config.json
 memory/autonomous_goals.db
