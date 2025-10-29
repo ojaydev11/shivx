@@ -52,17 +52,20 @@ class ActiveInferenceAgent(BaseAGIApproach):
                 free_energy = self._compute_free_energy(observation)
                 self.free_energy_history.append(free_energy)
 
-                # Record pattern
+                # Record pattern (clamp success_score to [0, 1])
+                success = 1.0 - min(1.0, max(0.0, free_energy))
+                success = max(0.0, min(1.0, success))  # Double clamp for safety
+
                 self.record_pattern(
                     pattern_type="inference",
                     context=f"task={task.get('type')}",
                     data={
                         "observation": observation,
                         "action": action,
-                        "free_energy": free_energy,
-                        "belief_entropy": self._entropy(self.beliefs),
+                        "free_energy": float(free_energy),
+                        "belief_entropy": float(self._entropy(self.beliefs)),
                     },
-                    success_score=1.0 - min(1.0, free_energy),
+                    success_score=success,
                     generalization_score=0.0,
                 )
 

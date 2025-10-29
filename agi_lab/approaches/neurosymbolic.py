@@ -48,7 +48,9 @@ class NeurosymbolicAI(BaseAGIApproach):
 
                 # Learn rules: if A and B then C
                 if "rule" in example:
-                    premises = set(example["rule"].get("if", []))
+                    premises_list = example["rule"].get("if", [])
+                    # Convert to tuple (hashable) instead of set
+                    premises = tuple(sorted(premises_list)) if premises_list else ()
                     conclusion = example["rule"].get("then", "")
                     self.rules.append((premises, conclusion))
 
