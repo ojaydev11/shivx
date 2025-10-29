@@ -23,6 +23,10 @@ from .approaches import (
     WorldModelLearner,
     MetaLearner,
     CausalReasoner,
+    NeurosymbolicAI,
+    ActiveInferenceAgent,
+    CompositionalReasoner,
+    AnalogicalReasoner,
 )
 
 
@@ -135,23 +139,30 @@ class ParallelExplorer:
         """Generate AGI approaches for this generation"""
         approaches = []
 
-        # Base approaches (always include)
+        # All 7 AGI approaches (evenly distributed)
         base_configs = [
             (AGIApproachType.WORLD_MODEL, {}),
             (AGIApproachType.META_LEARNING, {"init_lr": 0.1}),
             (AGIApproachType.CAUSAL, {}),
+            (AGIApproachType.NEUROSYMBOLIC, {"embedding_dim": 16}),
+            (AGIApproachType.ACTIVE_INFERENCE, {}),
+            (AGIApproachType.COMPOSITIONAL, {}),
+            (AGIApproachType.ANALOGICAL, {}),
         ]
 
-        # Add variations
+        # Distribute evenly across all approaches
+        approaches_per_type = max(1, self.num_parallel // len(base_configs))
+
         for approach_type, base_config in base_configs:
-            # Multiple configurations per approach
-            for i in range(self.num_parallel // len(base_configs)):
+            for i in range(approaches_per_type):
                 config = base_config.copy()
 
-                # Random variations
+                # Random variations per approach
                 if approach_type == AGIApproachType.META_LEARNING:
                     config["init_lr"] = np.random.uniform(0.01, 0.5)
                     config["init_exploration"] = np.random.uniform(0.1, 0.9)
+                elif approach_type == AGIApproachType.NEUROSYMBOLIC:
+                    config["embedding_dim"] = np.random.choice([8, 16, 32])
 
                 # Create approach instance
                 if approach_type == AGIApproachType.WORLD_MODEL:
@@ -160,6 +171,14 @@ class ParallelExplorer:
                     approach = MetaLearner(config=config, pattern_recorder=self.recorder)
                 elif approach_type == AGIApproachType.CAUSAL:
                     approach = CausalReasoner(config=config, pattern_recorder=self.recorder)
+                elif approach_type == AGIApproachType.NEUROSYMBOLIC:
+                    approach = NeurosymbolicAI(config=config, pattern_recorder=self.recorder)
+                elif approach_type == AGIApproachType.ACTIVE_INFERENCE:
+                    approach = ActiveInferenceAgent(config=config, pattern_recorder=self.recorder)
+                elif approach_type == AGIApproachType.COMPOSITIONAL:
+                    approach = CompositionalReasoner(config=config, pattern_recorder=self.recorder)
+                elif approach_type == AGIApproachType.ANALOGICAL:
+                    approach = AnalogicalReasoner(config=config, pattern_recorder=self.recorder)
                 else:
                     continue
 
