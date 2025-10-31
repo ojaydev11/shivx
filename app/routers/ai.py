@@ -130,34 +130,41 @@ async def list_models(
 @router.get("/models/{model_id}", response_model=ModelInfo)
 async def get_model(
     model_id: str,
-    current_user: TokenData = Depends(require_permission(Permission.READ))
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(require_permission(Permission.READ)),
+    settings: Settings = Depends(get_settings)
 ):
     """
     Get model details
 
     Requires: READ permission
     """
-    # TODO: Fetch from model registry
+    service = MLService(settings)
+    model = await service.get_model(db=db, model_id=model_id)
+
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model not found: {model_id}"
+        )
+
     return ModelInfo(
-        model_id=model_id,
-        name="RL Trading (PPO)",
-        version="1.0.0",
-        type="rl",
-        status="deployed",
-        accuracy=0.72,
-        performance_metrics={
-            "sharpe_ratio": 1.85,
-            "win_rate": 0.68,
-            "avg_return": 0.0145
-        },
-        trained_on=datetime(2025, 10, 20),
-        deployed_on=datetime(2025, 10, 25)
+        model_id=model.model_id,
+        name=model.name,
+        version=model.version,
+        type=model.model_type,
+        status=model.status.value,
+        accuracy=model.accuracy,
+        performance_metrics=model.performance_metrics or {},
+        trained_on=model.trained_on,
+        deployed_on=model.deployed_on
     )
 
 
 @router.post("/predict", response_model=PredictionResponse)
 async def predict(
     request: PredictionRequest,
+    db: AsyncSession = Depends(get_db),
     current_user: TokenData = Depends(require_permission(Permission.EXECUTE)),
     settings: Settings = Depends(get_settings)
 ):
@@ -169,41 +176,32 @@ async def predict(
     Args:
         request: Prediction request with model ID and features
     """
-    # TODO: Load model and make prediction
-    # from core.learning.model_registry import ModelRegistry
-    # registry = ModelRegistry()
-    # model = registry.load_model(request.model_id)
-    # prediction = model.predict(request.features)
+    service = MLService(settings)
 
-    prediction_id = f"pred_{datetime.now().timestamp()}"
-
-    response = PredictionResponse(
-        prediction_id=prediction_id,
+    prediction = await service.make_prediction(
+        db=db,
         model_id=request.model_id,
-        prediction={"action": "buy", "confidence": 0.82},
-        confidence=0.82,
-        generated_at=datetime.now()
+        features=request.features,
+        explain=request.explain,
+        user_id=current_user.username
     )
 
-    # Add explainability if requested
-    if request.explain:
-        response.explanation = {
-            "method": "LIME",
-            "important_features": [
-                {"feature": "rsi", "importance": 0.35},
-                {"feature": "macd", "importance": 0.28},
-                {"feature": "volume_trend", "importance": 0.22}
-            ],
-            "decision_boundary": "Confidence threshold: 0.70"
-        }
-
-    return response
+    return PredictionResponse(
+        prediction_id=prediction.prediction_id,
+        model_id=prediction.model_id,
+        prediction=prediction.prediction,
+        confidence=prediction.confidence,
+        explanation=prediction.explanation,
+        generated_at=prediction.generated_at
+    )
 
 
 @router.get("/training-jobs", response_model=List[TrainingJob])
 async def list_training_jobs(
     status: Optional[str] = None,
-    current_user: TokenData = Depends(require_permission(Permission.READ))
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(require_permission(Permission.READ)),
+    settings: Settings = Depends(get_settings)
 ):
     """
     List training jobs
@@ -213,32 +211,35 @@ async def list_training_jobs(
     Args:
         status: Filter by status (queued, running, completed, failed)
     """
-    # TODO: Fetch from training job queue
-    jobs = [
+    service = MLService(settings)
+
+    # Parse status
+    job_status = JobStatus(status) if status else None
+
+    jobs = await service.list_training_jobs(db=db, status=job_status)
+
+    return [
         TrainingJob(
-            job_id="job_123",
-            model_name="RL Trading v2",
-            model_type="rl",
-            status="running",
-            progress=0.65,
-            epochs_completed=65,
-            epochs_total=100,
-            loss=0.0125,
-            metrics={"reward": 1250.5, "sharpe": 1.92},
-            started_at=datetime.now()
+            job_id=job.job_id,
+            model_name=job.model_name,
+            model_type=job.model_type,
+            status=job.status.value,
+            progress=job.progress,
+            epochs_completed=job.epochs_completed,
+            epochs_total=job.epochs_total,
+            loss=job.loss,
+            metrics=job.metrics or {},
+            started_at=job.started_at
         )
+        for job in jobs
     ]
-
-    if status:
-        jobs = [j for j in jobs if j.status == status]
-
-    return jobs
 
 
 @router.post("/train", response_model=TrainingJob)
 async def start_training(
     config: TrainingConfig,
     background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
     current_user: TokenData = Depends(require_permission(Permission.ADMIN)),
     settings: Settings = Depends(get_settings)
 ):
@@ -257,91 +258,119 @@ async def start_training(
             detail="RL training is disabled"
         )
 
-    # Create job
-    job_id = f"job_{datetime.now().timestamp()}"
+    service = MLService(settings)
 
-    job = TrainingJob(
-        job_id=job_id,
+    job = await service.start_training(
+        db=db,
         model_name=config.model_name,
         model_type=config.model_type,
-        status="queued",
-        progress=0.0,
-        epochs_completed=0,
-        epochs_total=config.epochs,
-        metrics={}
+        dataset_id=config.dataset_id,
+        hyperparameters=config.hyperparameters,
+        epochs=config.epochs,
+        batch_size=config.batch_size,
+        learning_rate=config.learning_rate
     )
 
     # Add training task to background
-    # background_tasks.add_task(run_training, job_id, config)
+    # background_tasks.add_task(run_training, job.job_id, config)
 
-    return job
+    return TrainingJob(
+        job_id=job.job_id,
+        model_name=job.model_name,
+        model_type=job.model_type,
+        status=job.status.value,
+        progress=job.progress,
+        epochs_completed=job.epochs_completed,
+        epochs_total=job.epochs_total,
+        metrics=job.metrics or {}
+    )
 
 
 @router.get("/training-jobs/{job_id}", response_model=TrainingJob)
 async def get_training_job(
     job_id: str,
-    current_user: TokenData = Depends(require_permission(Permission.READ))
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(require_permission(Permission.READ)),
+    settings: Settings = Depends(get_settings)
 ):
     """
     Get training job details
 
     Requires: READ permission
     """
-    # TODO: Fetch job from queue/database
+    service = MLService(settings)
+    job = await service.get_training_job(db=db, job_id=job_id)
+
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training job not found: {job_id}"
+        )
+
     return TrainingJob(
-        job_id=job_id,
-        model_name="RL Trading v2",
-        model_type="rl",
-        status="running",
-        progress=0.65,
-        epochs_completed=65,
-        epochs_total=100,
-        loss=0.0125,
-        metrics={"reward": 1250.5, "sharpe": 1.92},
-        started_at=datetime.now()
+        job_id=job.job_id,
+        model_name=job.model_name,
+        model_type=job.model_type,
+        status=job.status.value,
+        progress=job.progress,
+        epochs_completed=job.epochs_completed,
+        epochs_total=job.epochs_total,
+        loss=job.loss,
+        metrics=job.metrics or {},
+        started_at=job.started_at
     )
 
 
 @router.post("/models/{model_id}/deploy")
 async def deploy_model(
     model_id: str,
-    current_user: TokenData = Depends(require_permission(Permission.ADMIN))
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(require_permission(Permission.ADMIN)),
+    settings: Settings = Depends(get_settings)
 ):
     """
     Deploy a trained model to production
 
     Requires: ADMIN permission
     """
-    # TODO: Deploy model
+    service = MLService(settings)
+    model = await service.deploy_model(db=db, model_id=model_id)
+
     return {
-        "model_id": model_id,
-        "status": "deployed",
-        "deployed_at": datetime.now()
+        "model_id": model.model_id,
+        "status": model.status.value,
+        "deployed_at": model.deployed_on
     }
 
 
 @router.post("/models/{model_id}/archive")
 async def archive_model(
     model_id: str,
-    current_user: TokenData = Depends(require_permission(Permission.ADMIN))
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(require_permission(Permission.ADMIN)),
+    settings: Settings = Depends(get_settings)
 ):
     """
     Archive a model
 
     Requires: ADMIN permission
     """
-    # TODO: Archive model
+    service = MLService(settings)
+    model = await service.archive_model(db=db, model_id=model_id)
+
     return {
-        "model_id": model_id,
-        "status": "archived",
-        "archived_at": datetime.now()
+        "model_id": model.model_id,
+        "status": model.status.value,
+        "archived_at": datetime.utcnow()
     }
 
 
 @router.get("/explainability/{prediction_id}")
 async def get_explainability(
     prediction_id: str,
-    current_user: TokenData = Depends(require_permission(Permission.READ))
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(require_permission(Permission.READ)),
+    settings: Settings = Depends(get_settings)
 ):
     """
     Get explainability analysis for a prediction
@@ -350,32 +379,10 @@ async def get_explainability(
 
     Uses LIME, SHAP, and attention visualization
     """
-    # TODO: Fetch explainability data
-    # from core.explain.xai import XAISystem
-    # xai = XAISystem(model)
-    # explanation = xai.explain(instance)
+    service = MLService(settings)
+    explanation = await service.get_explainability(db=db, prediction_id=prediction_id)
 
-    return {
-        "prediction_id": prediction_id,
-        "method": "LIME + SHAP",
-        "feature_importance": [
-            {"feature": "rsi", "importance": 0.35, "direction": "positive"},
-            {"feature": "macd", "importance": 0.28, "direction": "positive"},
-            {"feature": "volume_trend", "importance": 0.22, "direction": "positive"},
-            {"feature": "sentiment_score", "importance": 0.15, "direction": "negative"}
-        ],
-        "counterfactual": {
-            "description": "If RSI was below 30 (instead of 62), prediction would flip to SELL",
-            "minimal_changes": [
-                {"feature": "rsi", "current": 62, "required": 28}
-            ]
-        },
-        "confidence_breakdown": {
-            "model_confidence": 0.82,
-            "feature_agreement": 0.88,
-            "historical_accuracy": 0.75
-        }
-    }
+    return explanation
 
 
 @router.get("/capabilities")
