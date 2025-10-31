@@ -8,9 +8,13 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, require_permission, get_settings
 from app.dependencies.auth import TokenData
+from app.database import get_db
+from app.services.trading_service import TradingService
+from app.models.trading import PositionStatus, TradeAction
 from config.settings import Settings
 from core.security.hardening import Permission
 
@@ -89,6 +93,7 @@ class TradeResult(BaseModel):
 
 @router.get("/strategies", response_model=List[StrategyConfig])
 async def list_strategies(
+    db: AsyncSession = Depends(get_db),
     current_user: TokenData = Depends(require_permission(Permission.READ)),
     settings: Settings = Depends(get_settings)
 ):
@@ -97,39 +102,28 @@ async def list_strategies(
 
     Requires: READ permission
     """
-    # TODO: Fetch from database/service
+    service = TradingService(settings)
+    strategies = await service.get_strategies(db)
+
     return [
         StrategyConfig(
-            name="RL Trading (PPO)",
-            enabled=settings.feature_rl_trading,
-            max_position_size=settings.max_position_size,
-            stop_loss_pct=settings.stop_loss_pct,
-            take_profit_pct=settings.take_profit_pct,
-            risk_tolerance="medium"
-        ),
-        StrategyConfig(
-            name="Sentiment Analysis",
-            enabled=settings.feature_sentiment_analysis,
-            max_position_size=settings.max_position_size * 0.5,
-            stop_loss_pct=0.03,
-            take_profit_pct=0.07,
-            risk_tolerance="low"
-        ),
-        StrategyConfig(
-            name="DEX Arbitrage",
-            enabled=settings.feature_dex_arbitrage,
-            max_position_size=settings.max_position_size * 0.3,
-            stop_loss_pct=0.01,
-            take_profit_pct=0.02,
-            risk_tolerance="low"
+            name=strategy.name,
+            enabled=strategy.enabled,
+            max_position_size=strategy.max_position_size,
+            stop_loss_pct=strategy.stop_loss_pct,
+            take_profit_pct=strategy.take_profit_pct,
+            risk_tolerance=strategy.risk_tolerance
         )
+        for strategy in strategies
     ]
 
 
 @router.get("/positions", response_model=List[Position])
 async def list_positions(
     status: Optional[str] = None,
-    current_user: TokenData = Depends(require_permission(Permission.READ))
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(require_permission(Permission.READ)),
+    settings: Settings = Depends(get_settings)
 ):
     """
     List trading positions
@@ -139,19 +133,30 @@ async def list_positions(
     Args:
         status: Filter by status (open, closed, liquidated)
     """
-    # TODO: Fetch from trading engine
+    service = TradingService(settings)
+
+    # Parse status
+    position_status = PositionStatus(status) if status else None
+
+    positions = await service.get_positions(
+        db=db,
+        status=position_status,
+        user_id=current_user.username
+    )
+
     return [
         Position(
-            position_id="pos_123",
-            token="SOL",
-            size=100.0,
-            entry_price=98.50,
-            current_price=102.30,
-            pnl=3.80,
-            pnl_pct=0.0386,
-            opened_at=datetime.now(),
-            status="open"
+            position_id=pos.position_id,
+            token=pos.token,
+            size=pos.size,
+            entry_price=pos.entry_price,
+            current_price=pos.current_price,
+            pnl=pos.pnl,
+            pnl_pct=pos.pnl_pct,
+            opened_at=pos.opened_at,
+            status=pos.status.value
         )
+        for pos in positions
     ]
 
 
@@ -159,6 +164,7 @@ async def list_positions(
 async def get_signals(
     token: Optional[str] = None,
     strategy: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
     current_user: TokenData = Depends(require_permission(Permission.READ)),
     settings: Settings = Depends(get_settings)
 ):
@@ -171,30 +177,34 @@ async def get_signals(
         token: Filter by token symbol
         strategy: Filter by strategy name
     """
-    # TODO: Fetch from AI trading engine
     if not settings.feature_advanced_trading:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Advanced trading features are disabled"
         )
 
+    service = TradingService(settings)
+    signals = await service.generate_signals(db=db, token=token, strategy=strategy)
+
     return [
         TradeSignal(
-            signal_id="sig_456",
-            token="SOL",
-            action="buy",
-            confidence=0.82,
-            price_target=105.00,
-            strategy="RL Trading (PPO)",
-            reasoning="Strong upward momentum detected with high confidence prediction",
-            generated_at=datetime.now()
+            signal_id=sig.signal_id,
+            token=sig.token,
+            action=sig.action.value,
+            confidence=sig.confidence,
+            price_target=sig.price_target,
+            strategy=sig.strategy,
+            reasoning=sig.reasoning,
+            generated_at=sig.generated_at
         )
+        for sig in signals
     ]
 
 
 @router.post("/execute", response_model=TradeResult)
 async def execute_trade(
     trade: TradeExecution,
+    db: AsyncSession = Depends(get_db),
     current_user: TokenData = Depends(require_permission(Permission.EXECUTE)),
     settings: Settings = Depends(get_settings)
 ):
@@ -212,38 +222,44 @@ async def execute_trade(
     Raises:
         HTTPException: If trading is disabled or execution fails
     """
-    # Check if we're in paper trading mode
-    if settings.trading_mode.value == "paper":
-        # Simulate trade execution
-        return TradeResult(
-            trade_id=f"paper_trade_{datetime.now().timestamp()}",
+    try:
+        service = TradingService(settings)
+
+        execution = await service.execute_trade(
+            db=db,
             token=trade.token,
             action=trade.action,
-            amount_in=trade.amount,
-            amount_out=trade.amount * 0.99,  # Simulate 1% slippage
-            price=100.0,  # Mock price
-            slippage_actual=0.01,
-            executed_at=datetime.now(),
-            transaction_signature=None,
-            status="success"
+            amount=trade.amount,
+            slippage_bps=trade.slippage_bps,
+            user_id=current_user.username
         )
 
-    # TODO: Implement live trading
-    # from core.income.advanced_trading_ai import AdvancedTradingAI
-    # trading_ai = AdvancedTradingAI(config)
-    # result = await trading_ai.execute_trade(trade)
-    # return result
+        return TradeResult(
+            trade_id=execution.trade_id,
+            token=execution.token,
+            action=execution.action.value,
+            amount_in=execution.amount_in,
+            amount_out=execution.amount_out,
+            price=execution.price,
+            slippage_actual=execution.slippage_actual,
+            executed_at=execution.executed_at,
+            transaction_signature=execution.transaction_signature,
+            status=execution.status
+        )
 
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Live trading not yet implemented"
-    )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Trade execution failed: {str(e)}"
+        )
 
 
 @router.get("/performance")
 async def get_performance(
     period: str = "24h",
-    current_user: TokenData = Depends(require_permission(Permission.READ))
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(require_permission(Permission.READ)),
+    settings: Settings = Depends(get_settings)
 ):
     """
     Get trading performance metrics
@@ -256,48 +272,42 @@ async def get_performance(
     Returns:
         Performance metrics
     """
-    return {
-        "period": period,
-        "total_trades": 145,
-        "winning_trades": 92,
-        "losing_trades": 53,
-        "win_rate": 0.634,
-        "total_pnl": 1250.30,
-        "total_pnl_pct": 0.125,
-        "sharpe_ratio": 1.85,
-        "max_drawdown": -0.08,
-        "average_trade_duration_minutes": 45,
-        "best_strategy": "RL Trading (PPO)",
-        "updated_at": datetime.now()
-    }
+    service = TradingService(settings)
+    return await service.get_performance(db=db, period=period)
 
 
 @router.post("/strategies/{strategy_name}/enable")
 async def enable_strategy(
     strategy_name: str,
-    current_user: TokenData = Depends(require_permission(Permission.WRITE))
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(require_permission(Permission.WRITE)),
+    settings: Settings = Depends(get_settings)
 ):
     """
     Enable a trading strategy
 
     Requires: WRITE permission
     """
-    # TODO: Update strategy status
-    return {"strategy": strategy_name, "enabled": True}
+    service = TradingService(settings)
+    strategy = await service.update_strategy_status(db=db, strategy_name=strategy_name, enabled=True)
+    return {"strategy": strategy.name, "enabled": strategy.enabled}
 
 
 @router.post("/strategies/{strategy_name}/disable")
 async def disable_strategy(
     strategy_name: str,
-    current_user: TokenData = Depends(require_permission(Permission.WRITE))
+    db: AsyncSession = Depends(get_db),
+    current_user: TokenData = Depends(require_permission(Permission.WRITE)),
+    settings: Settings = Depends(get_settings)
 ):
     """
     Disable a trading strategy
 
     Requires: WRITE permission
     """
-    # TODO: Update strategy status
-    return {"strategy": strategy_name, "enabled": False}
+    service = TradingService(settings)
+    strategy = await service.update_strategy_status(db=db, strategy_name=strategy_name, enabled=False)
+    return {"strategy": strategy.name, "enabled": strategy.enabled}
 
 
 @router.get("/mode")
