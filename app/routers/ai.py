@@ -8,9 +8,13 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_current_user, require_permission, get_settings
 from app.dependencies.auth import TokenData
+from app.database import get_db
+from app.services.ml_service import MLService
+from app.models.ml import ModelStatus, JobStatus
 from config.settings import Settings
 from core.security.hardening import Permission
 
@@ -88,6 +92,7 @@ class TrainingConfig(BaseModel):
 @router.get("/models", response_model=List[ModelInfo])
 async def list_models(
     status: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
     current_user: TokenData = Depends(require_permission(Permission.READ)),
     settings: Settings = Depends(get_settings)
 ):
@@ -99,44 +104,27 @@ async def list_models(
     Args:
         status: Filter by status (training, ready, deployed, archived)
     """
-    # TODO: Fetch from model registry
-    models = [
+    service = MLService(settings)
+
+    # Parse status
+    model_status = ModelStatus(status) if status else None
+
+    models = await service.list_models(db=db, status=model_status)
+
+    return [
         ModelInfo(
-            model_id="rl_ppo_v1",
-            name="RL Trading (PPO)",
-            version="1.0.0",
-            type="rl",
-            status="deployed",
-            accuracy=0.72,
-            performance_metrics={
-                "sharpe_ratio": 1.85,
-                "win_rate": 0.68,
-                "avg_return": 0.0145
-            },
-            trained_on=datetime(2025, 10, 20),
-            deployed_on=datetime(2025, 10, 25)
-        ),
-        ModelInfo(
-            model_id="lstm_price_v2",
-            name="LSTM Price Predictor",
-            version="2.0.0",
-            type="supervised",
-            status="deployed",
-            accuracy=0.78,
-            performance_metrics={
-                "mae": 1.25,
-                "rmse": 2.10,
-                "r2": 0.85
-            },
-            trained_on=datetime(2025, 10, 22),
-            deployed_on=datetime(2025, 10, 27)
+            model_id=model.model_id,
+            name=model.name,
+            version=model.version,
+            type=model.model_type,
+            status=model.status.value,
+            accuracy=model.accuracy,
+            performance_metrics=model.performance_metrics or {},
+            trained_on=model.trained_on,
+            deployed_on=model.deployed_on
         )
+        for model in models
     ]
-
-    if status:
-        models = [m for m in models if m.status == status]
-
-    return models
 
 
 @router.get("/models/{model_id}", response_model=ModelInfo)
